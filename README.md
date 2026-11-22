@@ -47,12 +47,14 @@ Needs Visual Studio 2022 (Desktop C++ workload) and Git. In a *Developer PowerSh
 git clone https://github.com/microsoft/vcpkg $HOME\vcpkg
 git -C $HOME\vcpkg checkout (Get-Content vcpkg.json | ConvertFrom-Json).'builtin-baseline'
 & $HOME\vcpkg\bootstrap-vcpkg.bat -disableMetrics
-cmake -S . -B build-win -A x64 -DCMAKE_TOOLCHAIN_FILE=$HOME\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake -S . -B build-win -A x64 -DCMAKE_TOOLCHAIN_FILE=$HOME\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
 cmake --build build-win --config Release --parallel
 ctest --test-dir build-win -C Release --output-on-failure
 build-win\Release\camera_probe.exe
 build-win\Release\camera_viewer.exe
 ```
+
+Use the static triplet: with plain `x64-windows`, libdatachannel's DLL import library clashes with our `std::vector<std::byte>` instantiations at link time (LNK2005).
 
 The camera backend is Media Foundation (`src/sources/windows_mf/`). Its DLLs are delay-loaded: on systems without
 Media Foundation (Windows N, Server without the feature, IoT images with the package removed) the apps run and report

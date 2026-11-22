@@ -115,6 +115,15 @@ if(EME_BUILD_APPS)
     add_executable(webrtc_streamer apps/webrtc_streamer/main.cpp)
     target_link_libraries(webrtc_streamer PRIVATE eme::webrtc eme::openh264)
   endif()
+  if(MSVC)  # app-local VC++ runtime: older machines ship an outdated system MSVCP140.dll that crashes these binaries
+    include(InstallRequiredSystemLibraries)
+    foreach(app synthetic_streamer camera_probe camera_viewer webrtc_streamer)
+      if(TARGET ${app})
+        add_custom_command(TARGET ${app} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                           ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} $<TARGET_FILE_DIR:${app}>)
+      endif()
+    endforeach()
+  endif()
 endif()
 
 # EME-014/015/016 spikes: SFU publisher comparison. Off by default; SDK path needs -DLiveKit_DIR=<sdk>/lib/cmake/LiveKit.
