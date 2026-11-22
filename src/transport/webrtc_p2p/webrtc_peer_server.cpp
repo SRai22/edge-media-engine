@@ -1,16 +1,15 @@
 #include "eme/transport/webrtc_peer_server.hpp"
 
+#include "../webrtc_common/h264_track.hpp"
+
 #include <rtc/rtc.hpp>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <nlohmann/json.hpp>
-#include <random>
 
 namespace eme {
 namespace {
-
-constexpr int kH264PayloadType = 96;
 
 // Constant-time compare so the token cannot be recovered by timing.
 bool tokenMatches(std::string_view given, std::string_view expected) {
@@ -32,20 +31,6 @@ std::string_view tokenFromPath(std::string_view path) {
     rest = rest.substr(amp + 1);
   }
   return {};
-}
-
-// Browsers need SPS/PPS before an IDR. Encoders that only provide them out of band get them prepended.
-bool startsWithSps(const std::vector<std::byte>& au) {
-  std::size_t i = 0;
-  if (au.size() > 4 && au[0] == std::byte{0} && au[1] == std::byte{0} && au[2] == std::byte{0} && au[3] == std::byte{1}) i = 4;
-  else if (au.size() > 3 && au[0] == std::byte{0} && au[1] == std::byte{0} && au[2] == std::byte{1}) i = 3;
-  else return false;
-  return (std::to_integer<unsigned>(au[i]) & 0x1f) == 7;
-}
-
-std::uint32_t randomSsrc() {
-  static thread_local std::mt19937 rng{std::random_device{}()};
-  return std::uniform_int_distribution<std::uint32_t>(1, 0xfffffffe)(rng);
 }
 
 }  // namespace
@@ -209,24 +194,12 @@ void WebRtcPeerServer::createPeer(std::shared_ptr<rtc::WebSocket> ws) {
   const std::string cname = "eme-" + std::to_string(peer->id);
 
   for (std::size_t i = 0; i < inputs_.size(); ++i) {
-    const auto ssrc = randomSsrc();
     const std::string mid = "video" + std::to_string(i);
-    rtc::Description::Video media(mid, rtc::Description::Direction::SendOnly);
-    media.addH264Codec(kH264PayloadType);
-    media.addSSRC(ssrc, cname, "eme", mid);
-    auto track = peer->pc->addTrack(media);
-
-    auto rtp = std::make_shared<rtc::RtpPacketizationConfig>(ssrc, cname, kH264PayloadType,
-                                                             rtc::H264RtpPacketizer::ClockRate);
-    auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(rtc::NalUnit::Separator::StartSequence, rtp);
-    packetizer->addToChain(std::make_shared<rtc::RtcpSrReporter>(rtp));
-    packetizer->addToChain(std::make_shared<rtc::RtcpNackResponder>());
     Distributor<EncodedVideoFrame>* input = inputs_[i];
-    packetizer->addToChain(std::make_shared<rtc::PliHandler>([weakPeer, input] {
+    auto track = detail::addH264SendTrack(*peer->pc, mid, cname, [weakPeer, input] {
       if (auto p = weakPeer.lock()) ++p->pli;
       input->requestKeyframe();  // coalesced + rate-limited by the shared encoder
-    }));
-    track->setMediaHandler(packetizer);
+    });
 
     // Subscribe only once media can flow, so the first frame this peer gets is a keyframe.
     track->onOpen([this, weakPeer, input, i] {
@@ -350,16 +323,8 @@ void WebRtcPeerServer::dispatch(std::stop_token st) {
     for (auto& w : work) {
       while (auto frame = w.input->tryPop()) {
         if (!w.track->isOpen()) continue;
-        const auto& au = frame->payload->bytes;
-        const rtc::FrameInfo info{std::chrono::duration<double>(static_cast<double>(frame->presentationTimestampNs) / 1e9)};
         try {
-          if (frame->isKeyframe && frame->codecConfig.parameterSets && !startsWithSps(au)) {
-            rtc::binary withConfig(*frame->codecConfig.parameterSets);
-            withConfig.insert(withConfig.end(), au.begin(), au.end());
-            w.track->sendFrame(std::move(withConfig), info);
-          } else {
-            w.track->sendFrame(au.data(), au.size(), info);  // packetizer copies into RTP packets
-          }
+          detail::sendAccessUnit(*w.track, *frame);
           ++w.peer->framesSent;
         } catch (const std::exception& e) {
           spdlog::warn("{}: peer {} send failed: {}", name(), w.peer->id, e.what());

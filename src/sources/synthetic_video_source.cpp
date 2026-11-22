@@ -6,6 +6,9 @@
 #include <cstring>
 #include <span>
 #include <mutex>
+#include <random>
+
+#include "eme/testing/barcode.hpp"
 
 namespace eme {
 namespace {
@@ -57,6 +60,21 @@ std::optional<VideoFormat> SyntheticVideoSource::outputFormat() const {
 
 Result SyntheticVideoSource::start() {
   if (!valid()) return fail(ErrorCode::InvalidArgument, name() + ": needs even positive width/height, fps > 0, poolSize > 0, NV12 or I420");
+  if (config_.timestampBarcode && !mock::barcodeFits(config_.width, config_.height)) {
+    return fail(ErrorCode::InvalidArgument, name() + ": timestamp barcode needs width >= 512 and height >= 128");
+  }
+  if (config_.pattern == SyntheticPattern::MovingTexture && texture_.empty()) {
+    const auto w = static_cast<std::size_t>(config_.width), h = static_cast<std::size_t>(config_.height);
+    texture_.resize(w * h);
+    std::mt19937 rng(config_.sourceId + 1);
+    std::uniform_int_distribution<int> luma(40, 220);
+    for (std::size_t by = 0; by < h; by += 8)
+      for (std::size_t bx = 0; bx < w; bx += 8) {
+        const auto v = static_cast<std::uint8_t>(luma(rng));
+        for (std::size_t y = by; y < std::min(by + 8, h); ++y)
+          std::memset(texture_.data() + y * w + bx, v, std::min<std::size_t>(8, w - bx));
+      }
+  }
   if (!config_.manualClock) worker_ = std::jthread([this](std::stop_token st) { run(st); });
   return {};
 }
@@ -76,14 +94,31 @@ bool SyntheticVideoSource::emitFrame() {
     return false;
   }
   const std::uint64_t id = nextId_++;
-  drawTestPattern(buffer->data(), config_.width, config_.height, id);
+  const auto captureNs = steadyNowNs();
+  if (config_.pattern == SyntheticPattern::MovingTexture && !texture_.empty()) {
+    const auto w = static_cast<std::size_t>(config_.width), h = static_cast<std::size_t>(config_.height);
+    auto* dst = reinterpret_cast<std::uint8_t*>(buffer->data().data());
+    const std::size_t shift = (id * 4) % w;
+    for (std::size_t y = 0; y < h; ++y) {  // pan left: row = texture[shift..w) + texture[0..shift)
+      const std::uint8_t* src = texture_.data() + y * w;
+      std::memcpy(dst + y * w, src + shift, w - shift);
+      std::memcpy(dst + y * w + (w - shift), src, shift);
+    }
+    std::memset(dst + w * h, 128, w * h / 2);
+  } else {
+    drawTestPattern(buffer->data(), config_.width, config_.height, id);
+  }
+  if (config_.timestampBarcode) {
+    mock::writeBarcode(reinterpret_cast<std::uint8_t*>(buffer->data().data()), config_.width, config_.width,
+                       static_cast<std::uint64_t>(captureNs / 1000));
+  }
   const VideoFrame frame{
       .frameId = id,
       .sourceId = config_.sourceId,
       .width = config_.width,
       .height = config_.height,
       .pixelFormat = config_.pixelFormat,
-      .captureTimestampNs = steadyNowNs(),
+      .captureTimestampNs = captureNs,
       .presentationTimestampNs = static_cast<std::int64_t>(id * 1'000'000'000ULL / static_cast<unsigned>(config_.fps)),
       .buffer = std::move(buffer),
   };

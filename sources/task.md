@@ -13,3 +13,10 @@
   nlohmann-json 3.12.0, spdlog 1.17.0, gtest 1.18.0.
 - nasm 2.16.01 copied from Ubuntu's own package (`apt-get download`) into ~/.local/bin (no sudo available).
 - The system FFmpeg has only libx264 (GPL) for software H.264, so it is not used.
+
+## EME-014/015/016 session (2026-11-21)
+- LiveKit C++ SDK v1.13.1 prebuilt `livekit-sdk-ubuntu-24.04-x64-1.13.1.tar.gz`, sha256 matched the GitHub asset digest.
+  `include/livekit/*.h` read for API (EncodedVideoSource, TrackPublishOptions::video_encoder, VideoStream).
+- LiveKit server v1.13.11 and Ingress v1.6.0 Docker images; lk CLI v2.19.2 (digest verified). Ingress config fields from
+  `livekit/ingress` v1.6.0 `pkg/config/config.go`; `enable_transcoding` semantics from `livekit/protocol` `livekit_ingress.proto`.
+- libcurl 8.23.0 via vcpkg (license curl/ISC/BSD-3).

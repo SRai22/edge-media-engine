@@ -69,3 +69,25 @@ Dependencies: vcpkg 2026.10.16, libdatachannel 0.24.6, OpenH264 2.6.0, nlohmann-
 | 6 | forced keyframe lost if EncodeFrame fails | fixed: flag restored |
 | 7 | PLI amplification relies on EncoderNode rate limit | accepted: default 500 ms; per-peer PLI limit listed in EME-008 follow-ups |
 | T | tautological sharing assertion; no SPS profile check; missing malformed-input test | fixed (3 test changes) |
+
+---
+
+# Verification report: EME-014/015/016 (SFU publisher spikes) · 2026-11-21
+
+Review method: live runs against local LiveKit 1.13.11 + Ingress 1.6.0 (Docker), unit tests and sanitizers, and an independent Sonnet reviewer of the WHIP code and the measurement method.
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Separate ticket per spike + evaluation | pass | `tickets/EME-014`, `EME-015`, `EME-016` | — |
+| SDK path publishes pre-encoded H.264, no re-encode | pass | eval: encoded/captured = 1.000; subscriber decodes 282 frames/track/20 s | first attempt delivered 0 frames: `VideoEncoderBackend::PreEncoded` was missing |
+| WHIP path publishes via Ingress without transcoding | pass | Ingress log "Using proxied WHIP handler"; Ingress ~0.002 cores; 291 frames/track/20 s | — |
+| Keyframe requests reach the shared encoder on both paths | pass | WHIP: 7 PLIs → 7 forced keyframes per camera; SDK: 10 feedback requests → 8 forced | — |
+| Measurements comparable and repeatable | pass | 3 interleaved runs per mode on fresh stacks; ranges reported; stamp read on 100% of frames | review: unequal timestamps, mislabelled windows, process-start-based late-join metric and the size baseline were fixed, and the run repeated. The first two result sets were discarded |
+| Encoder speed not a confounder | pass | 0 encoder-input drops at 15 fps in the final runs | Release spike build had linked vcpkg's debug OpenH264 (cached pkg-config); fixed with a fresh `build-spike` tree |
+| WHIP security: token not leaked | pass | `WhipHttp.OriginComparisonGuardsTheToken`; DELETE only to same-origin resource | review finding A1 |
+| Memory / thread safety after refactor + WHIP | pass | ASan+UBSan 2/2 × 37; TSan 5/5 × 37 with `tests/tsan.supp` | libstdc++ future suppression added (TSan cannot model the futex) |
+| Report with recommendation | pass | `docs/reports/sfu-publisher-spike.md`, ADR-005 (proposed) | — |
+| Results on Windows IoT target | unresolved | Linux i7-8550U only, all components on one host | rerun with EME-001 hardware |
+| WHIP reconnect / bandwidth feedback | unresolved | not implemented in the spike | EME-007 follow-ups |
+
+Remaining review items, not fixed and low risk: `resolveUrl` for query strings in relative Locations; `setupTimeout` applies to gathering and HTTP separately (up to 2×).
