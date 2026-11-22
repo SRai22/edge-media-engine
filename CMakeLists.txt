@@ -11,6 +11,14 @@ option(EME_BUILD_APPS "Build example applications" ON)
 option(EME_WITH_WEBRTC "Build the libdatachannel WebRTC transport (needs vcpkg deps)" ON)
 option(EME_WITH_OPENH264 "Build the OpenH264 software encoder (needs vcpkg deps)" ON)
 
+if(MSVC)
+  add_compile_options(/utf-8)  # fmt/spdlog require it
+endif()
+if(WIN32)
+  # Windows 10+; keep <windows.h> from defining min/max and pulling in winsock 1 (breaks std::min, httplib).
+  add_compile_definitions(_WIN32_WINNT=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+endif()
+
 find_package(Threads REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
@@ -33,19 +41,33 @@ endif()
 target_compile_options(eme_core PRIVATE ${EME_WARNINGS})
 
 if(EME_WITH_OPENH264)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(OPENH264 REQUIRED IMPORTED_TARGET openh264)
+  if(NOT WIN32)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(OPENH264 REQUIRED IMPORTED_TARGET openh264)
+  else()  # vcpkg installs openh264 with a .pc file only; a pkg-config on PATH (e.g. Strawberry Perl's) won't see it
+    find_path(OPENH264_INCLUDE_DIR wels/codec_api.h REQUIRED)
+    find_library(OPENH264_LIBRARY NAMES openh264 REQUIRED)
+    add_library(PkgConfig::OPENH264 UNKNOWN IMPORTED)
+    set_target_properties(PkgConfig::OPENH264 PROPERTIES IMPORTED_LOCATION ${OPENH264_LIBRARY}
+                          INTERFACE_INCLUDE_DIRECTORIES ${OPENH264_INCLUDE_DIR})
+  endif()
   add_library(eme_openh264 src/processing/encoder/openh264_encoder.cpp)
   add_library(eme::openh264 ALIAS eme_openh264)
   target_link_libraries(eme_openh264 PUBLIC eme::core PRIVATE PkgConfig::OPENH264)
   target_compile_options(eme_openh264 PRIVATE ${EME_WARNINGS})
 endif()
 
-option(EME_WITH_CAMERA "Build the camera source (V4L2 on Linux; Media Foundation on Windows: EME-004)" ON)
+option(EME_WITH_CAMERA "Build the camera source (V4L2 on Linux, Media Foundation on Windows)" ON)
 if(EME_WITH_CAMERA)
   find_package(libyuv CONFIG REQUIRED)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_library(eme_camera src/sources/v4l2/camera_v4l2.cpp)
+  elseif(WIN32)
+    find_package(wil CONFIG REQUIRED)
+    add_library(eme_camera src/sources/windows_mf/camera_mf.cpp)
+    target_link_libraries(eme_camera PRIVATE WIL::WIL mfplat mf mfreadwrite mfuuid ole32 delayimp)
+    # Delay-loaded so executables still start where Media Foundation is not installed (see platform() in camera_mf.cpp).
+    target_link_options(eme_camera INTERFACE /DELAYLOAD:mfplat.dll /DELAYLOAD:mf.dll /DELAYLOAD:mfreadwrite.dll)
   else()
     message(FATAL_ERROR "EME_WITH_CAMERA: no camera backend for ${CMAKE_SYSTEM_NAME} yet (Windows: EME-004)")
   endif()

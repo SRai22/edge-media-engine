@@ -25,6 +25,10 @@
     {
       "name": "cpp-httplib",
       "default-features": false
+    },
+    {
+      "name": "wil",
+      "platform": "windows"
     }
   ]
 }

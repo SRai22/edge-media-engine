@@ -123,3 +123,31 @@ ASan clean; TSan 3/3 clean.
 
 Remaining review items, not fixed: one camera failing at `STREAMON` stops the whole app (low severity); no pixel-content assertion in tests
 (a covered camera is legitimately black).
+
+---
+
+# Verification report: EME-004 (Windows Media Foundation camera source) · 2026-11-21
+
+Review method: Linux build and tests (no Windows machine or cross-compiler here), an independent Sonnet reviewer
+(read-only, 12 findings), and Windows CI (`.github/workflows/windows.yml`, windows-latest, MSVC `/W4 /permissive-`, vcpkg manifest at the pinned baseline).
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Same `camera.hpp` contract; `camera_viewer`/`camera_probe` unchanged | pass (source) | `src/sources/windows_mf/camera_mf.cpp`; no app/test source changes; mode choice, claims, effective fps, config validation shared with V4L2 via `src/sources/camera_common.hpp` | — |
+| Compiles on Windows (MSVC) and all tests pass, camera tests skipped | unresolved | CI not run yet: needs the branch pushed | — |
+| Linux still green after the shared-helper refactor | pass | `build/`: 42/42 with both real cameras attached (no skips), 0 compiler warnings | — |
+| Enumeration: `MFEnumDeviceSources`, id = symbolic link, name = friendly name, bus = device instance | pass (source) | `listDevices()`, `instanceFromLink()` | — |
+| Capabilities from the real device report | pass (source) / unresolved (hardware) | native types of the first video stream grouped into `CameraMode`s (`listModes`) | needs `camera_probe.exe` on a real camera |
+| Mode choice: closest size, then NV12 > I420 > YUY2 > UYVY > MJPG reaching the rate | pass (source) | `kPreference` + shared `chooseMode` (same code path as Linux) | — |
+| Async `IMFSourceReader`; callback never blocks | pass (review) | callback only converts into a pool buffer, publishes (non-blocking) and re-issues `ReadSample`; teardown gate is lock-free on the callback side (`busy_`/`owner_`) | review: gate first used `try_lock`, which would stall capture when `OnEvent` and `OnReadSample` overlapped; replaced before review |
+| libyuv `ConvertToI420` + `FramePool` | pass (source) | contiguous buffer + `minBytes` length guard | — |
+| Timestamps on `steady_clock`, monotonic across reconnects | pass (source) | MF time anchored per reader; falls back to arrival time if the driver's time does not advance | review #6 (frozen sample times would drop every frame) |
+| Unplug → clean DeviceLost, no leaks; rediscover same camera by name + bus with claim registry | unresolved (hardware) | `MF_SOURCE_READERF_ERROR`/failed status/`MEVideoCaptureDeviceRemoved` → `deviceLost`; worker shuts the source down (RAII `wil::com_ptr`), reconnect mirrors Linux rules | owner: physical unplug/replug on Windows |
+| `simulateDeviceLossForTesting` | unresolved (hardware) | `Camera.ResumesAfterDeviceLoss` runs only with a camera | owner: run `ctest` on the Windows box with a camera |
+| 720p15 from each real camera (two cameras) | unresolved (hardware) | — | owner steps in progress.md |
+| WIL for COM RAII; COM/MF init per thread | pass (source) | `wil::com_ptr_nothrow`, `wil::unique_cotaskmem_*`, WRL `RuntimeClass` for the callback; process-wide `CoIncrementMTAUsage` + `MFStartup` once, worker joins MTA via `wil::CoInitializeEx_failfast` | — |
+| Runs where Media Foundation is absent (IoT package removed, N editions, Server) | pass (source) / unresolved (CI) | MF DLLs delay-loaded; `platform()` probes them, then `enumerateCameras()` is empty and `open()` returns DeviceLost | — |
+
+Review findings fixed: 1 (Strawberry Perl's pkg-config shadowing the Windows OpenH264 fallback), 2 (`wil` string out-params via `.put()`), 3 (explicit
+`objbase.h`/WRL/`<atomic>`/`<functional>` includes), 4, 6, 8 (log before the worker starts), 10 (mid-stream type change → reopen with the original type).
+Not changed: 9 (a loss injected while already lost fires after reconnect: same as Linux), 5/7/11 (notes, no defect), 12 (no stall watchdog: same as Linux).
