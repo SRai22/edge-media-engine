@@ -15,6 +15,7 @@ struct SyntheticSourceConfig {
   int width = 1280;
   int height = 720;
   int fps = 15;
+  PixelFormat pixelFormat = PixelFormat::NV12;  // NV12 or I420 (same size, same neutral pattern)
   std::size_t poolSize = 4;
   bool manualClock = false;  // true: no thread, caller drives emitFrame() (deterministic tests)
 };

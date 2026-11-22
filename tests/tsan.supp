@@ -1,0 +1,10 @@
+# Third-party reports only (triaged 2026-11-21, libdatachannel 0.24.6 / OpenSSL 3.6.5 from vcpkg, not TSan-instrumented).
+# Never suppress anything in eme:: here; fix it instead.
+# OpenSSL hashtable uses hand-rolled atomics TSan cannot see.
+race:match_key
+race:alloc_new_value
+# libdatachannel certificate generated on a worker and read via shared_future.
+race:rtc::impl::Certificate
+# Lock-order reports among libdatachannel's internal callback/transport mutexes.
+deadlock:rtc::synchronized_callback
+deadlock:rtc::impl::TcpTransport

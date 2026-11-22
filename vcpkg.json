@@ -1,5 +1,12 @@
 {
   "name": "edge-media-engine",
   "version": "0.1.0",
-  "dependencies": ["spdlog", "gtest"]
+  "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
+  "dependencies": [
+    "spdlog",
+    "gtest",
+    "nlohmann-json",
+    { "name": "libdatachannel", "features": ["srtp", "ws"] },
+    "openh264"
+  ]
 }

@@ -2,7 +2,9 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <algorithm>
 #include <cstring>
+#include <span>
 #include <mutex>
 
 namespace eme {
@@ -19,6 +21,19 @@ std::size_t nv12Bytes(const SyntheticSourceConfig& c) {
   return static_cast<std::size_t>(c.width) * static_cast<std::size_t>(c.height) * 3 / 2;
 }
 
+// NV12/I420 (identical with neutral chroma): dark luma with a bright vertical bar that moves 8 px per frame; neutral chroma. Frame id in the
+// first 8 luma bytes so tests can identify frames.
+void drawTestPattern(std::span<std::byte> nv12, int width, int height, std::uint64_t id) {
+  const auto w = static_cast<std::size_t>(width);
+  const auto h = static_cast<std::size_t>(height);
+  std::memset(nv12.data(), 16, w * h);
+  std::memset(nv12.data() + w * h, 128, w * h / 2);
+  const std::size_t barX = (id * 8) % w;
+  const std::size_t barW = std::min<std::size_t>(32, w - barX);
+  for (std::size_t y = 0; y < h; ++y) std::memset(nv12.data() + y * w + barX, 235, barW);
+  std::memcpy(nv12.data(), &id, sizeof id);
+}
+
 }  // namespace
 
 SyntheticVideoSource::SyntheticVideoSource(std::string name, SyntheticSourceConfig config)
@@ -27,19 +42,21 @@ SyntheticVideoSource::SyntheticVideoSource(std::string name, SyntheticSourceConf
 SyntheticVideoSource::~SyntheticVideoSource() { stop(); }
 
 bool SyntheticVideoSource::valid() const noexcept {
-  return nv12Bytes(config_) >= sizeof(std::uint64_t) && config_.fps > 0 && config_.poolSize > 0;
+  const bool format = config_.pixelFormat == PixelFormat::NV12 || config_.pixelFormat == PixelFormat::I420;
+  return format && config_.width % 2 == 0 && config_.height % 2 == 0 && nv12Bytes(config_) >= sizeof(std::uint64_t) &&
+         config_.fps > 0 && config_.poolSize > 0;
 }
 
 std::optional<VideoFormat> SyntheticVideoSource::outputFormat() const {
   return VideoFormat{.kind = MediaKind::RawVideo,
-                     .pixelFormat = PixelFormat::NV12,
+                     .pixelFormat = config_.pixelFormat,
                      .width = config_.width,
                      .height = config_.height,
                      .fps = config_.fps};
 }
 
 Result SyntheticVideoSource::start() {
-  if (!valid()) return fail(ErrorCode::InvalidArgument, name() + ": width/height/fps/poolSize must be positive");
+  if (!valid()) return fail(ErrorCode::InvalidArgument, name() + ": needs even positive width/height, fps > 0, poolSize > 0, NV12 or I420");
   if (!config_.manualClock) worker_ = std::jthread([this](std::stop_token st) { run(st); });
   return {};
 }
@@ -59,14 +76,13 @@ bool SyntheticVideoSource::emitFrame() {
     return false;
   }
   const std::uint64_t id = nextId_++;
-  // shortcut: stamps only the frame id into the luma plane; add real test patterns if a consumer inspects pixels.
-  std::memcpy(buffer->data().data(), &id, sizeof id);
+  drawTestPattern(buffer->data(), config_.width, config_.height, id);
   const VideoFrame frame{
       .frameId = id,
       .sourceId = config_.sourceId,
       .width = config_.width,
       .height = config_.height,
-      .pixelFormat = PixelFormat::NV12,
+      .pixelFormat = config_.pixelFormat,
       .captureTimestampNs = steadyNowNs(),
       .presentationTimestampNs = static_cast<std::int64_t>(id * 1'000'000'000ULL / static_cast<unsigned>(config_.fps)),
       .buffer = std::move(buffer),
