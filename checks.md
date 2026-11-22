@@ -69,3 +69,85 @@ Dependencies: vcpkg 2026.10.16, libdatachannel 0.24.6, OpenH264 2.6.0, nlohmann-
 | 6 | forced keyframe lost if EncodeFrame fails | fixed: flag restored |
 | 7 | PLI amplification relies on EncoderNode rate limit | accepted: default 500 ms; per-peer PLI limit listed in EME-008 follow-ups |
 | T | tautological sharing assertion; no SPS profile check; missing malformed-input test | fixed (3 test changes) |
+
+---
+
+# Verification report: EME-014/015/016 (SFU publisher spikes) · 2026-11-21
+
+Review method: live runs against local LiveKit 1.13.11 + Ingress 1.6.0 (Docker), unit tests and sanitizers, and an independent Sonnet reviewer of the WHIP code and the measurement method.
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Separate ticket per spike + evaluation | pass | `tickets/EME-014`, `EME-015`, `EME-016` | — |
+| SDK path publishes pre-encoded H.264, no re-encode | pass | eval: encoded/captured = 1.000; subscriber decodes 282 frames/track/20 s | first attempt delivered 0 frames: `VideoEncoderBackend::PreEncoded` was missing |
+| WHIP path publishes via Ingress without transcoding | pass | Ingress log "Using proxied WHIP handler"; Ingress ~0.002 cores; 291 frames/track/20 s | — |
+| Keyframe requests reach the shared encoder on both paths | pass | WHIP: 7 PLIs → 7 forced keyframes per camera; SDK: 10 feedback requests → 8 forced | — |
+| Measurements comparable and repeatable | pass | 3 interleaved runs per mode on fresh stacks; ranges reported; stamp read on 100% of frames | review: unequal timestamps, mislabelled windows, process-start-based late-join metric and the size baseline were fixed, and the run repeated. The first two result sets were discarded |
+| Encoder speed not a confounder | pass | 0 encoder-input drops at 15 fps in the final runs | Release spike build had linked vcpkg's debug OpenH264 (cached pkg-config); fixed with a fresh `build-spike` tree |
+| WHIP security: token not leaked | pass | `WhipHttp.OriginComparisonGuardsTheToken`; DELETE only to same-origin resource | review finding A1 |
+| Memory / thread safety after refactor + WHIP | pass | ASan+UBSan 2/2 × 37; TSan 5/5 × 37 with `tests/tsan.supp` | libstdc++ future suppression added (TSan cannot model the futex) |
+| Report with recommendation | pass | `docs/reports/sfu-publisher-spike.md`, ADR-005 (proposed) | — |
+| Results on Windows IoT target | unresolved | Linux i7-8550U only, all components on one host | rerun with EME-001 hardware |
+| WHIP reconnect / bandwidth feedback | unresolved | not implemented in the spike | EME-007 follow-ups |
+
+Remaining review items, not fixed and low risk: `resolveUrl` for query strings in relative Locations; `setupTimeout` applies to gathering and HTTP separately (up to 2×).
+
+---
+
+# Verification report: EME-017 (Linux camera source + multi-camera example) · 2026-11-21
+
+Review method: real hardware (integrated Chicony camera + Logitech 046d:0821 USB camera), Chrome in the built-in browser,
+ffmpeg as an independent reference, unit and integration tests, sanitizers, and an independent Sonnet reviewer (read-only).
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Camera enumeration + capabilities report | pass | `camera_probe`: 2 cameras with full mode lists (the metadata node `/dev/video1` is correctly excluded) | review: odd `/dev/video*` names no longer abort enumeration |
+| Capture via V4L2 → I420, using libraries for conversion | pass | libyuv `ConvertToI420` (MJPEG via libjpeg-turbo); `Camera.CapturesI420FramesWithMonotonicTimestamps` | — |
+| Mode choice per PLAN §5.2 | pass | 720p15 → MJPEG on both cameras (raw YUYV at 720p tops out at 10 fps); integrated camera 30 → 15 by even dropping | review: zero-rate S_PARM, aspect tie-break, and the effective rate (not the requested one) passed downstream |
+| Each camera encoded once, N viewers | pass | browser: 2 tabs → encoding 40 frames/s total (10+15+15) while 80 frames/s go out; 0 packets lost | — |
+| Camera runs without viewers (PLAN §15) | pass | `/api/stats` with 0 viewers: captured ≈ encoded on both cameras | — |
+| Output correctness | pass | Logitech mean luma 82 in our pipeline vs 87 from ffmpeg. The integrated camera is black in both (ffmpeg 8): covered by the privacy shutter, not a pipeline bug | — |
+| Access control | pass | wrong token → HTTP 403; token constant-time compared, never logged; binds to 127.0.0.1 by default | — |
+| CLI robustness | pass | `--size 1280` rejected; numbers must be digits and within range | review finding 7 |
+| No orphan device on setup failure | pass | encoder created before the camera node is adopted | review finding 8 |
+| Busy camera in tests | pass | EBUSY → `ResourceExhausted` → test skips | review finding 2 |
+| Memory / thread safety | pass | ASan+UBSan 40/40 (+ 12 s `camera_viewer` run, both cameras); TSan 2/2 × 40 | — |
+| Test fix found during verification | pass | the capture test held every frame, exhausting the 4-buffer pool (published 4, dropped 95) | test now consumes frames like a real consumer |
+| Unplug → paused, other cameras continue; replug → resumes | pass | physical test: Logitech lost 23:29:28, back 23:29:43 via `/dev/video2` (was `/dev/video3`); viewer never reloaded, 15 fps, 0 loss, 0 freezes; `Camera.ResumesAfterDeviceLoss` (simulated loss) | added reconnect (2026-11-21). After review fixes: moved to another USB port (4.3 → 2), lost 23:34:33, back 23:34:46, viewer kept decoding (0 loss, 0 freezes) |
+| Windows | unresolved | EME-004 (same `camera.hpp` interface) | — |
+
+Reconnect review (Sonnet): wrong-camera matching (bus-only, name fallback stealing another source's camera) fixed by requiring name + bus
+(bus may differ only if the camera is the sole one with that name), a process-wide claim registry, a sysfs-based candidate scan, and
+initial-only format writes; `Camera.SecondSourceCannotClaimTheSameCamera` added; the reconnect test now asserts the paused state. 42/42 tests;
+ASan clean; TSan 3/3 clean.
+
+Remaining review items, not fixed: one camera failing at `STREAMON` stops the whole app (low severity); no pixel-content assertion in tests
+(a covered camera is legitimately black).
+
+---
+
+# Verification report: EME-004 (Windows Media Foundation camera source) · 2026-11-21
+
+Review method: Linux build and tests (no Windows machine or cross-compiler here), an independent Sonnet reviewer
+(read-only, 12 findings), and Windows CI (`.github/workflows/windows.yml`, windows-latest, MSVC `/W4 /permissive-`, vcpkg manifest at the pinned baseline).
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Same `camera.hpp` contract; `camera_viewer`/`camera_probe` unchanged | pass (source) | `src/sources/windows_mf/camera_mf.cpp`; no app/test source changes; mode choice, claims, effective fps, config validation shared with V4L2 via `src/sources/camera_common.hpp` | — |
+| Compiles on Windows (MSVC) and all tests pass, camera tests skipped | unresolved | CI not run yet: needs the branch pushed | — |
+| Linux still green after the shared-helper refactor | pass | `build/`: 42/42 with both real cameras attached (no skips), 0 compiler warnings | — |
+| Enumeration: `MFEnumDeviceSources`, id = symbolic link, name = friendly name, bus = device instance | pass (source) | `listDevices()`, `instanceFromLink()` | — |
+| Capabilities from the real device report | pass (source) / unresolved (hardware) | native types of the first video stream grouped into `CameraMode`s (`listModes`) | needs `camera_probe.exe` on a real camera |
+| Mode choice: closest size, then NV12 > I420 > YUY2 > UYVY > MJPG reaching the rate | pass (source) | `kPreference` + shared `chooseMode` (same code path as Linux) | — |
+| Async `IMFSourceReader`; callback never blocks | pass (review) | callback only converts into a pool buffer, publishes (non-blocking) and re-issues `ReadSample`; teardown gate is lock-free on the callback side (`busy_`/`owner_`) | review: gate first used `try_lock`, which would stall capture when `OnEvent` and `OnReadSample` overlapped; replaced before review |
+| libyuv `ConvertToI420` + `FramePool` | pass (source) | contiguous buffer + `minBytes` length guard | — |
+| Timestamps on `steady_clock`, monotonic across reconnects | pass (source) | MF time anchored per reader; falls back to arrival time if the driver's time does not advance | review #6 (frozen sample times would drop every frame) |
+| Unplug → clean DeviceLost, no leaks; rediscover same camera by name + bus with claim registry | unresolved (hardware) | `MF_SOURCE_READERF_ERROR`/failed status/`MEVideoCaptureDeviceRemoved` → `deviceLost`; worker shuts the source down (RAII `wil::com_ptr`), reconnect mirrors Linux rules | owner: physical unplug/replug on Windows |
+| `simulateDeviceLossForTesting` | unresolved (hardware) | `Camera.ResumesAfterDeviceLoss` runs only with a camera | owner: run `ctest` on the Windows box with a camera |
+| 720p15 from each real camera (two cameras) | unresolved (hardware) | — | owner steps in progress.md |
+| WIL for COM RAII; COM/MF init per thread | pass (source) | `wil::com_ptr_nothrow`, `wil::unique_cotaskmem_*`, WRL `RuntimeClass` for the callback; process-wide `CoIncrementMTAUsage` + `MFStartup` once, worker joins MTA via `wil::CoInitializeEx_failfast` | — |
+| Runs where Media Foundation is absent (IoT package removed, N editions, Server) | pass (source) / unresolved (CI) | MF DLLs delay-loaded; `platform()` probes them, then `enumerateCameras()` is empty and `open()` returns DeviceLost | — |
+
+Review findings fixed: 1 (Strawberry Perl's pkg-config shadowing the Windows OpenH264 fallback), 2 (`wil` string out-params via `.put()`), 3 (explicit
+`objbase.h`/WRL/`<atomic>`/`<functional>` includes), 4, 6, 8 (log before the worker starts), 10 (mid-stream type change → reopen with the original type).
+Not changed: 9 (a loss injected while already lost fires after reconnect: same as Linux), 5/7/11 (notes, no defect), 12 (no stall watchdog: same as Linux).

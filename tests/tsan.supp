@@ -8,3 +8,6 @@ race:rtc::impl::Certificate
 # Lock-order reports among libdatachannel's internal callback/transport mutexes.
 deadlock:rtc::synchronized_callback
 deadlock:rtc::impl::TcpTransport
+# libstdc++ std::promise/std::future hand-off synchronises via futex, which TSan does not model (seen with
+# libdatachannel's PeerConnection internals and the WHIP gathering promise). Added 2026-11-21.
+race:std::__future_base::_State_baseV2::_M_do_set

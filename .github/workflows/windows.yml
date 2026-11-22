@@ -1,0 +1,50 @@
+# Windows (MSVC + vcpkg manifest) build and tests (EME-012, minimal). Runners have no camera: camera tests skip.
+name: windows
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  msvc:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/../vcpkg-cache
+    steps:
+      - uses: actions/checkout@v4
+
+      # Server images lack Media Foundation unless the feature is added. Best effort: without it the camera backend
+      # still loads (delay-loaded DLLs) and reports no cameras.
+      - name: Media Foundation feature
+        continue-on-error: true
+        shell: pwsh
+        run: Install-WindowsFeature Server-Media-Foundation
+
+      - name: vcpkg at the manifest baseline
+        shell: bash
+        run: |
+          baseline=$(python -c "import json;print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" checkout "$baseline"
+          "$VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-win-x64-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-win-x64-
+
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Probe cameras (expects an empty list on CI)
+        run: build/Release/camera_probe.exe

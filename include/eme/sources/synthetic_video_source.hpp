@@ -4,11 +4,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <thread>
+#include <vector>
 
 #include "eme/core/frame_pool.hpp"
 #include "eme/core/node.hpp"
 
 namespace eme {
+
+enum class SyntheticPattern {
+  MovingBar,      // nearly free to encode; good for functional tests
+  MovingTexture,  // random 8x8 blocks panning 4 px/frame: realistic encoder load and bitrate
+};
 
 struct SyntheticSourceConfig {
   std::uint32_t sourceId = 0;
@@ -18,6 +24,8 @@ struct SyntheticSourceConfig {
   PixelFormat pixelFormat = PixelFormat::NV12;  // NV12 or I420 (same size, same neutral pattern)
   std::size_t poolSize = 4;
   bool manualClock = false;  // true: no thread, caller drives emitFrame() (deterministic tests)
+  SyntheticPattern pattern = SyntheticPattern::MovingBar;
+  bool timestampBarcode = false;  // stamp capture time (monotonic µs) for latency measurement, see eme/testing/barcode.hpp
 };
 
 // Stand-in for a camera: NV12 CPU frames from a bounded pool at a fixed rate.
@@ -44,6 +52,7 @@ class SyntheticVideoSource final : public Node, public Producer<VideoFrame> {
 
   SyntheticSourceConfig config_;
   FramePool pool_;
+  std::vector<std::uint8_t> texture_;  // MovingTexture only, built in start()
   Distributor<VideoFrame> output_;
   std::atomic<std::uint64_t> nextId_{0};
   std::atomic<std::uint64_t> produced_{0};

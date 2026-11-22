@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EME Cameras</title>
+<style>
+  :root { --bg: #f6f6f4; --card: #ffffff; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e2dd; --ok: #2f7d4f; --bad: #b3412f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #151514; --card: #1f1f1d; --fg: #ececea; --muted: #9a9a94; --line: #33332f; --ok: #6cc28f; --bad: #e07a66; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; margin-bottom: 12px; }
+  h1 { font-size: 18px; margin: 0; }
+  #status, .meta { color: var(--muted); }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .card video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+  .card .info { padding: 8px 10px; }
+  .card .name { font-weight: 600; }
+  .lost { color: var(--bad); }
+  #summary { margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  #summary b { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Edge Media Engine cameras</h1>
+  <span id="status">connecting…</span>
+</header>
+<div class="grid" id="videos"></div>
+<div id="summary">Viewers: <b id="viewers">–</b>. Each camera is encoded once; extra tabs add viewers, not encoders.</div>
+<script>
+const q = new URLSearchParams(location.search);
+const token = q.get('token') || '';
+const wsPort = Number(location.port || 80) + 1;
+const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+const status = (t) => { document.getElementById('status').textContent = t; window.emeStatus = t; };
+const api = (path) => fetch(`${path}?token=${encodeURIComponent(token)}`).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+const cards = new Map();  // mid -> {video, meta}
+let labels = [];
+
+function card(mid) {
+  if (cards.has(mid)) return cards.get(mid);
+  const i = labels.findIndex((l) => l.mid === mid);
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = '<video autoplay muted playsinline></video><div class="info"><div class="name"></div><div class="meta"></div></div>';
+  el.querySelector('.name').textContent = i >= 0 ? labels[i].label : mid;
+  el.querySelector('.meta').textContent = i >= 0 ? labels[i].mode : '';
+  document.getElementById('videos').appendChild(el);
+  const c = { video: el.querySelector('video'), meta: el.querySelector('.meta'), mode: i >= 0 ? labels[i].mode : '', index: i };
+  c.video.dataset.mid = mid;
+  cards.set(mid, c);
+  return c;
+}
+
+async function main() {
+  try { labels = await api('/api/cameras'); } catch { status('access denied: open the URL printed by camera_viewer'); return; }
+  const pc = new RTCPeerConnection();
+  window.pc = pc;
+  pc.ontrack = (e) => { card(e.transceiver.mid).video.srcObject = new MediaStream([e.track]); };
+  pc.onconnectionstatechange = () => status(pc.connectionState === 'connected' ? 'live' : pc.connectionState);
+  const ws = new WebSocket(`${scheme}://${location.hostname}:${wsPort}/?token=${encodeURIComponent(token)}`);
+  ws.onclose = () => { if (pc.connectionState !== 'connected') status('signaling closed (viewer limit reached?)'); };
+  ws.onmessage = async (m) => {
+    const { type, sdp } = JSON.parse(m.data);
+    if (type !== 'offer') return;
+    await pc.setRemoteDescription({ type, sdp });
+    await pc.setLocalDescription(await pc.createAnswer());
+    await new Promise((r) => { if (pc.iceGatheringState === 'complete') r(); else pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); });
+    ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription.sdp }));
+  };
+  setInterval(async () => {
+    try {
+      const s = await api('/api/stats');
+      document.getElementById('viewers').textContent = s.viewers;
+      for (const c of cards.values()) {
+        const cam = s.cameras[c.index];
+        if (!cam) continue;
+        const v = c.video;
+        const shown = v.videoWidth ? `${v.videoWidth}×${v.videoHeight}` : 'waiting';
+        c.meta.textContent = cam.deviceLost
+          ? `${c.mode} · camera unplugged, reconnecting… (resumes automatically when plugged back in)`
+          : `${c.mode} · showing ${shown} · encoded once: ${cam.encoded} frames` + (cam.reconnects ? ` · reconnected ${cam.reconnects}×` : '');
+        c.meta.classList.toggle('lost', !!cam.deviceLost);
+      }
+    } catch { /* server stopped */ }
+  }, 1000);
+}
+main();
+</script>
+</body>
+</html>

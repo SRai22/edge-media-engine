@@ -67,3 +67,5 @@ vcpkg_installed/
 Testing/
 .cache/
 build-vcpkg/
+spikes/livekit/.run/
+spikes/sfu_eval/results/

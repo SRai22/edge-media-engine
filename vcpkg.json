@@ -6,7 +6,29 @@
     "spdlog",
     "gtest",
     "nlohmann-json",
-    { "name": "libdatachannel", "features": ["srtp", "ws"] },
-    "openh264"
+    {
+      "name": "libdatachannel",
+      "features": [
+        "srtp",
+        "ws"
+      ]
+    },
+    "openh264",
+    {
+      "name": "curl",
+      "default-features": false,
+      "features": [
+        "openssl"
+      ]
+    },
+    "libyuv",
+    {
+      "name": "cpp-httplib",
+      "default-features": false
+    },
+    {
+      "name": "wil",
+      "platform": "windows"
+    }
   ]
 }
