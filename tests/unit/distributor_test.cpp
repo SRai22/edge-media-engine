@@ -97,3 +97,17 @@ TEST(Distributor, RequestsKeyframeOnJoinAndOnDependencyLoss) {
   d.publish(encoded(2, false));  // still waiting -> no new request
   EXPECT_EQ(requests, 2);
 }
+
+TEST(Distributor, NotifiesAfterEnqueueAndForwardsKeyframeRequests) {
+  Distributor<EncodedVideoFrame> d;
+  int requests = 0, notified = 0;
+  d.setKeyframeRequester([&] { ++requests; });
+  auto sub = d.subscribe(2, OverflowPolicy::DropUntilKeyframe, [&] { ++notified; });
+  d.publish(encoded(0, false));  // dropped while waiting: no notify
+  EXPECT_EQ(notified, 0);
+  d.publish(encoded(1, true));
+  EXPECT_EQ(notified, 1);
+  EXPECT_TRUE(sub->tryPop());
+  d.requestKeyframe();
+  EXPECT_EQ(requests, 2);  // join + explicit (e.g. RTCP PLI)
+}

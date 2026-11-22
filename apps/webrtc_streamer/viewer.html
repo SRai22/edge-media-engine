@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EME Viewer</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #151514; --fg: #ececea; --muted: #9a9a94; } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  video { width: 100%; background: #000; border-radius: 6px; }
+  #status { color: var(--muted); margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="status">connecting…</div>
+<div class="grid" id="videos"></div>
+<script>
+// Viewer for apps/webrtc_streamer: ?port=8443&token=...&host=127.0.0.1&tls=0
+const q = new URLSearchParams(location.search);
+const host = q.get('host') || '127.0.0.1', port = q.get('port') || '8443';
+const scheme = q.get('tls') === '1' ? 'wss' : 'ws';
+const status = (t) => { document.getElementById('status').textContent = t; window.emeStatus = t; };
+const pc = new RTCPeerConnection();
+pc.ontrack = (e) => {
+  const v = document.createElement('video');
+  v.autoplay = true; v.muted = true; v.playsInline = true; v.dataset.mid = e.transceiver.mid;
+  v.srcObject = new MediaStream([e.track]);
+  document.getElementById('videos').appendChild(v);
+};
+pc.onconnectionstatechange = () => status('peer: ' + pc.connectionState);
+const ws = new WebSocket(`${scheme}://${host}:${port}/?token=${encodeURIComponent(q.get('token') || '')}`);
+ws.onclose = () => { if (pc.connectionState !== 'connected') status('signaling closed (bad token or peer limit?)'); };
+ws.onmessage = async (m) => {
+  const { type, sdp } = JSON.parse(m.data);
+  if (type !== 'offer') return;
+  await pc.setRemoteDescription({ type, sdp });
+  await pc.setLocalDescription(await pc.createAnswer());
+  // Non-trickle: the server expects one answer with all candidates.
+  await new Promise((r) => { if (pc.iceGatheringState === 'complete') r(); else pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); });
+  ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription.sdp }));
+};
+</script>
+</body>
+</html>

@@ -34,9 +34,12 @@ struct QueueStats {
 template <class T>
 class Subscription {
  public:
-  Subscription(std::size_t capacity, OverflowPolicy policy)
+  // notify (optional) runs on the producer thread after each enqueue, under the distributor's lock:
+  // it must be cheap and must never call back into the Distributor (e.g. set a flag + notify a cv).
+  Subscription(std::size_t capacity, OverflowPolicy policy, std::function<void()> notify = {})
       : capacity_(std::max<std::size_t>(1, capacity)),
         policy_(policy),
+        notify_(std::move(notify)),
         waitingForKeyframe_(policy == OverflowPolicy::DropUntilKeyframe) {}
 
   // Returns true when this consumer just lost a dependency and needs a keyframe.
@@ -70,6 +73,7 @@ class Subscription {
       stats_.highWatermark = std::max(stats_.highWatermark, q_.size());
     }
     cv_.notify_one();
+    if (notify_) notify_();
     return false;
   }
 
@@ -106,6 +110,7 @@ class Subscription {
 
   const std::size_t capacity_;
   const OverflowPolicy policy_;
+  const std::function<void()> notify_;
   mutable std::mutex m_;
   std::condition_variable_any cv_;
   std::deque<T> q_;
@@ -123,8 +128,9 @@ class Distributor {
     requester_ = std::move(fn);
   }
 
-  std::shared_ptr<Subscription<T>> subscribe(std::size_t capacity, OverflowPolicy policy) {
-    auto sub = std::make_shared<Subscription<T>>(capacity, policy);
+  std::shared_ptr<Subscription<T>> subscribe(std::size_t capacity, OverflowPolicy policy,
+                                             std::function<void()> notify = {}) {
+    auto sub = std::make_shared<Subscription<T>>(capacity, policy, std::move(notify));
     std::function<void()> request;
     {
       std::lock_guard lock(m_);
@@ -149,6 +155,16 @@ class Distributor {
         }
       }
       if (needKeyframe) request = requester_;
+    }
+    if (request) request();
+  }
+
+  // For transports relaying receiver feedback (RTCP PLI/FIR). Coalesced and rate-limited by the producer.
+  void requestKeyframe() {
+    std::function<void()> request;
+    {
+      std::lock_guard lock(m_);
+      request = requester_;
     }
     if (request) request();
   }

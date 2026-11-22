@@ -1,4 +1,4 @@
-# Architecture (as built, M1)
+# Architecture (as built: M1 + EME-008)
 
 ```text
 SyntheticVideoSource ──Distributor<VideoFrame>──▶ EncoderNode(IVideoEncoder) ──Distributor<EncodedVideoFrame>──┬─▶ sink / p2p peer
@@ -13,7 +13,9 @@ SyntheticVideoSource ──Distributor<VideoFrame>──▶ EncoderNode(IVideoEn
 | Graph | `eme/core/node.hpp`, `graph.hpp` | ADR-003 |
 | Encoder interface | `eme/processing/video_encoder.hpp`, `encoder_node.hpp` | MF backend: EME-006 |
 | Synthetic source | `eme/sources/synthetic_video_source.hpp` | MF camera: EME-004 |
+| OpenH264 encoder | `eme/processing/openh264_encoder.hpp` | software fallback, ADR-004 |
+| Direct WebRTC | `eme/transport/webrtc_peer_server.hpp` | libdatachannel, ADR-004 |
 | Test doubles | `eme/testing/` (`eme::mock`) | mock H.264 encoder, counting sink |
 
-Threads: one per source (camera callback in MF), one per encoder, and one per mock sink. Real transports
-must not use a thread per viewer (EME-008).
+Threads: one per source (camera callback in MF), one per encoder, and one per mock sink. The WebRTC server uses
+one dispatcher thread for all peers, plus libdatachannel's own worker pool.
