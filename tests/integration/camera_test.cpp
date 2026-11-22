@@ -70,3 +70,61 @@ TEST(Camera, CapturesI420FramesWithMonotonicTimestamps) {
   EXPECT_EQ(cam.stats().framesDropped, 0u);
   EXPECT_FALSE(cam.stats().deviceLost);
 }
+
+TEST(Camera, SecondSourceCannotClaimTheSameCamera) {
+  const auto cams = enumerateCameras();
+  if (cams.empty()) GTEST_SKIP() << "no camera";
+  auto a = CameraSource::open("a", {.id = cams.front().id, .width = 640, .height = 480});
+  if (!a) GTEST_SKIP() << "camera unavailable: " << a.error().message;
+  auto b = CameraSource::open("b", {.id = cams.front().id, .width = 640, .height = 480});
+  ASSERT_FALSE(b);
+  EXPECT_EQ(b.error().code, ErrorCode::ResourceExhausted);
+  a->reset();  // released on close
+  EXPECT_TRUE(CameraSource::open("c", {.id = cams.front().id, .width = 640, .height = 480}));
+}
+
+// Simulated loss exercises release -> rediscover -> reopen on the same node. Real ENODEV detection and a changed
+// /dev node were verified with a physical unplug/replug (checks.md, EME-017).
+TEST(Camera, ResumesAfterDeviceLoss) {
+  const auto cams = enumerateCameras();
+  if (cams.empty()) GTEST_SKIP() << "no camera";
+  auto src = CameraSource::open("cam", {.id = cams.front().id, .width = 640, .height = 480, .fps = 15,
+                                        .reconnectInterval = std::chrono::milliseconds(1000)});
+  if (!src && (src.error().code == ErrorCode::DeviceLost || src.error().code == ErrorCode::ResourceExhausted)) {
+    GTEST_SKIP() << "camera unavailable or busy: " << src.error().message;
+  }
+  ASSERT_TRUE(src) << src.error().message;
+  MediaGraph g;
+  auto& cam = g.adopt(std::move(*src));
+  auto sub = cam.output().subscribe(2, OverflowPolicy::DropOldest);
+  ASSERT_TRUE(g.start());
+  std::uint64_t lastId = 0;
+  std::int64_t lastTs = -1;
+  int bad = 0;
+  auto drainUntil = [&](auto done, std::chrono::seconds timeout) {  // consume frames like a real consumer
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (!done() && std::chrono::steady_clock::now() < deadline) {
+      if (auto f = sub->tryPop()) {
+        if (lastTs >= 0 && (f->frameId <= lastId || f->captureTimestampNs <= lastTs)) ++bad;
+        lastId = f->frameId;
+        lastTs = f->captureTimestampNs;
+      } else {
+        std::this_thread::sleep_for(5ms);
+      }
+    }
+    return done();
+  };
+  ASSERT_TRUE(drainUntil([&] { return cam.stats().framesPublished >= 5; }, 10s));
+  cam.simulateDeviceLossForTesting();
+  ASSERT_TRUE(drainUntil([&] { return cam.stats().deviceLost; }, 5s)) << "loss not reported";
+  const auto atLoss = cam.stats().framesPublished;
+  std::this_thread::sleep_for(500ms);  // inside the 1 s reconnect wait
+  EXPECT_TRUE(cam.stats().deviceLost);
+  EXPECT_EQ(cam.stats().framesPublished, atLoss) << "must not publish while the device is gone";
+  ASSERT_TRUE(drainUntil([&] { return cam.stats().reconnects == 1; }, 10s)) << "never reconnected";
+  const auto resumedAt = cam.stats().framesPublished;
+  ASSERT_TRUE(drainUntil([&] { return cam.stats().framesPublished >= resumedAt + 5; }, 10s)) << "no frames after reconnect";
+  g.stop();
+  EXPECT_FALSE(cam.stats().deviceLost);
+  EXPECT_EQ(bad, 0) << "frame ids and timestamps must keep increasing across the reconnect";
+}

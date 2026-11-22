@@ -14,7 +14,8 @@ for what is built, and [tickets/](tickets/) for the roadmap.
 Open the printed `http://127.0.0.1:8640/?token=…` URL. Each camera is encoded once with H.264; every extra browser tab is
 another WebRTC viewer of the same encoded streams (the page shows the viewer count and per-camera encoded frames).
 Options: `--size 1280x720 --fps 15 --bitrate 1200000 --port 8640 --max-viewers 4 --listen 127.0.0.1`. Your user must be
-in the `video` group. `camera_probe` prints each camera's capture modes as JSON. Windows support: EME-004.
+in the `video` group. Unplugging a camera pauses its tile; plugging it back in resumes the stream automatically.
+`camera_probe` prints each camera's capture modes as JSON. Windows support: EME-004.
 
 ## Build: core only (Linux, system packages)
 

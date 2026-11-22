@@ -175,6 +175,7 @@ int main(int argc, char** argv) {
         c["captured"] = cs.framesCaptured;
         c["dropped"] = cs.framesDropped;
         c["deviceLost"] = cs.deviceLost;
+        c["reconnects"] = cs.reconnects;
       }
       cams.push_back(c);
     }

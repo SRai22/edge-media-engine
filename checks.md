@@ -113,8 +113,13 @@ ffmpeg as an independent reference, unit and integration tests, sanitizers, and 
 | Busy camera in tests | pass | EBUSY → `ResourceExhausted` → test skips | review finding 2 |
 | Memory / thread safety | pass | ASan+UBSan 40/40 (+ 12 s `camera_viewer` run, both cameras); TSan 2/2 × 40 | — |
 | Test fix found during verification | pass | the capture test held every frame, exhausting the 4-buffer pool (published 4, dropped 95) | test now consumes frames like a real consumer |
-| Unplug → DeviceLost, other cameras continue | unresolved | needs a physical unplug | owner to verify |
+| Unplug → paused, other cameras continue; replug → resumes | pass | physical test: Logitech lost 23:29:28, back 23:29:43 via `/dev/video2` (was `/dev/video3`); viewer never reloaded, 15 fps, 0 loss, 0 freezes; `Camera.ResumesAfterDeviceLoss` (simulated loss) | added reconnect (2026-11-21). After review fixes: moved to another USB port (4.3 → 2), lost 23:34:33, back 23:34:46, viewer kept decoding (0 loss, 0 freezes) |
 | Windows | unresolved | EME-004 (same `camera.hpp` interface) | — |
+
+Reconnect review (Sonnet): wrong-camera matching (bus-only, name fallback stealing another source's camera) fixed by requiring name + bus
+(bus may differ only if the camera is the sole one with that name), a process-wide claim registry, a sysfs-based candidate scan, and
+initial-only format writes; `Camera.SecondSourceCannotClaimTheSameCamera` added; the reconnect test now asserts the paused state. 42/42 tests;
+ASan clean; TSan 3/3 clean.
 
 Remaining review items, not fixed: one camera failing at `STREAMON` stops the whole app (low severity); no pixel-content assertion in tests
 (a covered camera is legitimately black).

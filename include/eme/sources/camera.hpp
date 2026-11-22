@@ -2,6 +2,8 @@
 // Platform-neutral camera capture. Linux: V4L2 (src/sources/v4l2). Windows: Media Foundation (EME-004).
 
 #include <atomic>
+#include <chrono>
+#include <stop_token>
 #include <cstdint>
 #include <expected>
 #include <memory>
@@ -36,17 +38,20 @@ struct CameraSourceConfig {
   int height = 720;
   int fps = 15;  // camera frames above this rate are dropped evenly
   std::size_t poolSize = 4;
+  std::chrono::milliseconds reconnectInterval{1000};  // how often to look for the camera after it was unplugged
 };
 
 struct CameraStats {
   std::uint64_t framesCaptured = 0;  // from the device
   std::uint64_t framesPublished = 0;
   std::uint64_t framesDropped = 0;   // pool exhausted or conversion failed
-  bool deviceLost = false;
+  bool deviceLost = false;        // currently unplugged / failed; capture resumes when it comes back
+  std::uint64_t reconnects = 0;   // successful recoveries
 };
 
-// Captures one camera into I420 CPU frames from a bounded pool. The capture thread never blocks on
-// consumers. Device removal stops capture and sets deviceLost (reconnect: EME-010).
+// Captures one camera into I420 CPU frames from a bounded pool. The capture thread never blocks on consumers.
+// If the camera is unplugged, capture pauses (deviceLost) and resumes automatically when the same camera is
+// plugged back in, with the same format, so encoders and viewers continue without renegotiation.
 class CameraSource final : public Node, public Producer<VideoFrame> {
  public:
   // Opens the device and negotiates the closest mode; the negotiated format is fixed afterwards.
@@ -59,12 +64,17 @@ class CameraSource final : public Node, public Producer<VideoFrame> {
   void stop() noexcept override;
 
   CameraStats stats() const;
+  // Test hook: makes the capture thread treat the device as lost, exercising the release/rediscover/reopen path
+  // without physically unplugging it.
+  void simulateDeviceLossForTesting();
   std::string negotiated() const;  // e.g. "MJPG 1280x720 @30 fps (emitting 15)"
 
   struct Impl;  // platform specific
 
  private:
   CameraSource(std::string name, std::unique_ptr<Impl> impl);
+  void run(std::stop_token st);
+  bool reconnect();
   std::unique_ptr<Impl> impl_;
   Distributor<VideoFrame> output_;
 };

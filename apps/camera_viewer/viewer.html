@@ -79,7 +79,9 @@ async function main() {
         if (!cam) continue;
         const v = c.video;
         const shown = v.videoWidth ? `${v.videoWidth}×${v.videoHeight}` : 'waiting';
-        c.meta.textContent = `${c.mode} · showing ${shown} · encoded once: ${cam.encoded} frames` + (cam.deviceLost ? ' · DEVICE LOST' : '');
+        c.meta.textContent = cam.deviceLost
+          ? `${c.mode} · camera unplugged, reconnecting… (resumes automatically when plugged back in)`
+          : `${c.mode} · showing ${shown} · encoded once: ${cam.encoded} frames` + (cam.reconnects ? ` · reconnected ${cam.reconnects}×` : '');
         c.meta.classList.toggle('lost', !!cam.deviceLost);
       }
     } catch { /* server stopped */ }

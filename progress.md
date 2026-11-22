@@ -51,7 +51,8 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
   livekit-server v1.13.11, ingress v1.6.0, redis 7.4.
 
 ## Next action
+Camera unplug/replug recovery (Linux) done and verified physically on the same and on another USB port.
 Windows example: implement `eme/sources/camera.hpp` with Media Foundation (EME-004) on a Windows machine; `camera_viewer`
-then runs unchanged. Needs a Windows dev box (MSVC + vcpkg; EME-012). Also: unplug test for EME-017.
+then runs unchanged. Needs a Windows dev box (MSVC + vcpkg; EME-012).
 Once ADR-005 is accepted: productionize `WhipPublisher` under EME-007 (reconnect, RTCP bandwidth feedback, track naming,
 HTTPS + short-lived keys), then run SFU + P2P together. Otherwise EME-003 (JSON config).
