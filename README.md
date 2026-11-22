@@ -4,7 +4,7 @@ A small C++23 media runtime: capture once, encode once per rendition, and fan ou
 over bounded, keyframe-aware queues. See [PLAN.md](PLAN.md) for the full specification, [docs/architecture.md](docs/architecture.md)
 for what is built, and [tickets/](tickets/) for the roadmap.
 
-**Status:** Milestone 1 (media core) and direct WebRTC peers (EME-008), on synthetic media with OpenH264. Windows capture, hardware encoding and the SFU publisher are not built yet.
+**Status:** Milestone 1 (media core) and direct WebRTC peers (EME-008), on synthetic media with OpenH264. Hardware encoding and the SFU publisher are not built yet. Windows camera capture (Media Foundation) builds in CI; real-camera checks on Windows are pending.
 
 ## Try it: every camera on this machine in the browser (Linux)
 
@@ -15,7 +15,7 @@ Open the printed `http://127.0.0.1:8640/?token=…` URL. Each camera is encoded 
 another WebRTC viewer of the same encoded streams (the page shows the viewer count and per-camera encoded frames).
 Options: `--size 1280x720 --fps 15 --bitrate 1200000 --port 8640 --max-viewers 4 --listen 127.0.0.1`. Your user must be
 in the `video` group. Unplugging a camera pauses its tile; plugging it back in resumes the stream automatically.
-`camera_probe` prints each camera's capture modes as JSON. Windows support: EME-004.
+`camera_probe` prints each camera's capture modes as JSON. On Windows the same apps use Media Foundation (below).
 
 ## Build: core only (Linux, system packages)
 
@@ -39,7 +39,24 @@ EME_TOKEN=$(python3 -c 'import secrets;print(secrets.token_urlsafe(16))') ./buil
 Serve `apps/webrtc_streamer/` (e.g. `python3 -m http.server 8000 --directory apps/webrtc_streamer`) and open
 `http://localhost:8000/viewer.html?port=8443&token=<EME_TOKEN>`.
 
-Windows/vcpkg: `vcpkg.json` lists the dependencies. It is not yet verified on Windows (EME-012).
+## Build: Windows (MSVC + vcpkg)
+
+Needs Visual Studio 2022 (Desktop C++ workload) and Git. In a *Developer PowerShell*:
+
+```powershell
+git clone https://github.com/microsoft/vcpkg $HOME\vcpkg
+git -C $HOME\vcpkg checkout (Get-Content vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+& $HOME\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+cmake -S . -B build-win -A x64 -DCMAKE_TOOLCHAIN_FILE=$HOME\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build-win --config Release --parallel
+ctest --test-dir build-win -C Release --output-on-failure
+build-win\Release\camera_probe.exe
+build-win\Release\camera_viewer.exe
+```
+
+The camera backend is Media Foundation (`src/sources/windows_mf/`). Its DLLs are delay-loaded: on systems without
+Media Foundation (Windows N, Server without the feature, IoT images with the package removed) the apps run and report
+no cameras. Allow desktop apps to use the camera under *Settings → Privacy → Camera*. CI: `.github/workflows/windows.yml`.
 
 Sanitizers: add `-DCMAKE_CXX_FLAGS="-fsanitize=thread"`. On Linux kernels ≥ 6.6, run TSan binaries under `setarch -R`
 (high ASLR entropy breaks TSan's memory layout), with `TSAN_OPTIONS=suppressions=tests/tsan.supp` for the vcpkg build.

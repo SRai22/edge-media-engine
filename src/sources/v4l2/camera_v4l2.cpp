@@ -15,7 +15,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <set>
 #include <libyuv.h>
 #include <condition_variable>
 #include <mutex>
@@ -23,6 +22,7 @@
 
 #include "eme/core/frame_pool.hpp"
 #include "eme/sources/camera.hpp"
+#include "../camera_common.hpp"
 
 namespace eme {
 namespace {
@@ -40,10 +40,10 @@ int xioctl(int fd, unsigned long req, void* arg) {
   return r;
 }
 
-// Formats libyuv::ConvertToI420 handles that cameras commonly offer. Order = preference when the size/rate fit
-// (PLAN §5.2: raw before MJPEG; native H.264 passthrough is a later optimisation).
-constexpr std::uint32_t kSupported[] = {V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_YUV420, V4L2_PIX_FMT_YUYV, V4L2_PIX_FMT_UYVY,
-                                        V4L2_PIX_FMT_MJPEG};
+// Formats libyuv::ConvertToI420 handles that cameras commonly offer (V4L2 fourcc names). Order = preference when the
+// size/rate fit (PLAN §5.2: raw before MJPEG; native H.264 passthrough is a later optimisation).
+constexpr std::string_view kPreference[] = {"NV12", "YU12", "YUYV", "UYVY", "MJPG"};
+using camera_detail::claims;
 
 std::uint32_t libyuvFourcc(std::uint32_t v4l2) {
   switch (v4l2) {
@@ -99,31 +99,6 @@ std::vector<CameraMode> listModes(int fd) {
 
 std::uint32_t fourccFromString(const std::string& s) {
   return v4l2_fourcc(s[0], s[1], s[2], s[3]);
-}
-
-// Device nodes currently owned by a CameraSource in this process, so reconnect never takes another source's camera.
-class Claims {
- public:
-  bool claim(const std::string& path) {
-    std::lock_guard l(m_);
-    return paths_.insert(path).second;
-  }
-  void release(const std::string& path) {
-    std::lock_guard l(m_);
-    paths_.erase(path);
-  }
-  bool claimed(const std::string& path) {
-    std::lock_guard l(m_);
-    return paths_.contains(path);
-  }
-
- private:
-  std::mutex m_;
-  std::set<std::string> paths_;
-};
-Claims& claims() {
-  static Claims c;
-  return c;
 }
 
 // Cheap rediscovery: sysfs names need no device open. Only nodes whose name equals `card` are candidates.
@@ -305,19 +280,11 @@ struct CameraSource::Impl {
 };
 
 namespace {
-
-// What downstream actually gets: the request, or less if the camera cannot go that fast.
-int effectiveFps(const CameraSource::Impl& d) {
-  return d.cameraFps > 0 ? std::min(d.config.fps, std::max(1, static_cast<int>(std::floor(d.cameraFps + 0.01)))) : d.config.fps;
-}
-
+int effectiveFps(const CameraSource::Impl& d) { return camera_detail::effectiveFps(d.config.fps, d.cameraFps); }
 }  // namespace
 
 std::expected<std::unique_ptr<CameraSource>, Error> CameraSource::open(std::string name, CameraSourceConfig config) {
-  if (config.width <= 0 || config.height <= 0 || config.width % 2 || config.height % 2 || config.fps <= 0 || config.poolSize == 0 ||
-      config.reconnectInterval.count() <= 0) {
-    return fail(ErrorCode::InvalidArgument, name + ": invalid camera config");
-  }
+  if (!camera_detail::validConfig(config)) return fail(ErrorCode::InvalidArgument, name + ": invalid camera config");
   std::vector<CameraMode> modes;
   {
     Fd probe(::open(config.id.c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC));
@@ -328,35 +295,13 @@ std::expected<std::unique_ptr<CameraSource>, Error> CameraSource::open(std::stri
   }
   if (modes.empty()) return fail(ErrorCode::Unsupported, name + ": no supported pixel format");
 
-  // Pick a mode: the size closest to the request (area, then aspect), then the first format in kSupported order
-  // that reaches the requested rate (PLAN §5.2: raw before MJPEG).
-  const auto area = [&](const CameraMode& m) { return std::abs(m.width * m.height - config.width * config.height); };
-  const double wantAspect = static_cast<double>(config.width) / config.height;
-  const auto aspectOff = [&](const CameraMode& m) { return std::abs(static_cast<double>(m.width) / m.height - wantAspect); };
-  const auto bestArea = area(*std::ranges::min_element(modes, {}, area));
-  const CameraMode* chosen = nullptr;
-  double chosenFps = 0;
-  for (auto f : kSupported) {
-    for (const auto& m : modes) {
-      if (area(m) != bestArea || fourccFromString(m.fourcc) != f) continue;
-      const double maxFps = m.fps.empty() ? 0 : *std::ranges::max_element(m.fps);
-      const bool betterShape = chosen && aspectOff(m) < aspectOff(*chosen) && maxFps >= std::min<double>(chosenFps, config.fps);
-      if (!chosen || betterShape || (chosenFps < config.fps && maxFps > chosenFps)) {
-        chosen = &m;
-        chosenFps = maxFps;
-      }
-    }
-    if (chosen && chosenFps >= config.fps) break;
-  }
-
+  const auto [chosen, rate] = camera_detail::chooseMode(modes, kPreference, config);
   auto impl = std::make_unique<Impl>();
   impl->config = config;
   impl->pixfmt = fourccFromString(chosen->fourcc);
   impl->width = chosen->width;
   impl->height = chosen->height;
-  // Lowest offered rate that still reaches the request: less USB bandwidth and work than running at max.
-  impl->requestRate = chosenFps;
-  for (double f : chosen->fps) if (f >= config.fps && f < impl->requestRate) impl->requestRate = f;
+  impl->requestRate = rate;
   if (auto r = impl->openDevice(config.id, name, true); !r) return std::unexpected(r.error());
   impl->pool = std::make_unique<FramePool>(static_cast<std::size_t>(impl->width) * static_cast<std::size_t>(impl->height) * 3 / 2,
                                            config.poolSize);
