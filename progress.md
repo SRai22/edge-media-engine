@@ -14,6 +14,8 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - EME-014/015/016: `include/eme/transport/whip_publisher.hpp`, `src/transport/whip/`, `src/transport/webrtc_common/`,
   `apps/spikes/**`, `spikes/livekit/` (local LiveKit stack: `up.sh`/`down.sh`), `spikes/sfu_eval/` (harness),
   `docs/reports/sfu-publisher-spike.md` (+ `data/`), `docs/design-decisions/ADR-005-*.md` (proposed)
+- EME-017: `include/eme/sources/camera.hpp`, `src/sources/v4l2/camera_v4l2.cpp`, `apps/camera_probe/`, `apps/camera_viewer/`
+  (`main.cpp`, `viewer.html` embedded at build), `tests/integration/camera_test.cpp`
 - Build trees: `build/` (core only), `build-vcpkg/` (+ `-addr`, `-thre` sanitizer trees), `build-spike/` (Release, spikes; use a fresh tree when switching build type: pkg-config caches debug OpenH264)
 - Verification: `checks.md` · task notes: `sources/task.md`
 
@@ -40,11 +42,16 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - Not tested: WebRTC under real loss (netem), SFU + P2P together, bitrate on real content.
 - `~/vcpkg` and `~/.local/bin/nasm` were installed outside the repo during this session.
 
+- **EME-017 Linux camera example:** `camera_viewer` streams every camera (here: integrated + Logitech USB + optional test
+  pattern) to the browser, each encoded once. Verified live with 2 tabs (40 frames/s encoded, 80 frames/s sent). 40/40 tests under
+  ASan/TSan. Sonnet review: 8 findings, 7 fixed. Branch `feat/eme-017-linux-camera-example` is stacked on the spike branch.
 - Owner decisions pending: ADR-005 (WHIP vs SDK). Also, the merge to main (30f74d6) left out `tickets/` and the
   ADR-001..004 files; they exist only in the working tree / this branch.
 - Installed outside the repo: `~/deps/livekit-sdk` (prebuilt SDK, digest-verified), `~/deps/lk` (lk CLI 2.19.2), and Docker images
   livekit-server v1.13.11, ingress v1.6.0, redis 7.4.
 
 ## Next action
+Windows example: implement `eme/sources/camera.hpp` with Media Foundation (EME-004) on a Windows machine; `camera_viewer`
+then runs unchanged. Needs a Windows dev box (MSVC + vcpkg; EME-012). Also: unplug test for EME-017.
 Once ADR-005 is accepted: productionize `WhipPublisher` under EME-007 (reconnect, RTCP bandwidth feedback, track naming,
 HTTPS + short-lived keys), then run SFU + P2P together. Otherwise EME-003 (JSON config).

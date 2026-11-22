@@ -91,3 +91,30 @@ Review method: live runs against local LiveKit 1.13.11 + Ingress 1.6.0 (Docker),
 | WHIP reconnect / bandwidth feedback | unresolved | not implemented in the spike | EME-007 follow-ups |
 
 Remaining review items, not fixed and low risk: `resolveUrl` for query strings in relative Locations; `setupTimeout` applies to gathering and HTTP separately (up to 2×).
+
+---
+
+# Verification report: EME-017 (Linux camera source + multi-camera example) · 2026-11-21
+
+Review method: real hardware (integrated Chicony camera + Logitech 046d:0821 USB camera), Chrome in the built-in browser,
+ffmpeg as an independent reference, unit and integration tests, sanitizers, and an independent Sonnet reviewer (read-only).
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Camera enumeration + capabilities report | pass | `camera_probe`: 2 cameras with full mode lists (the metadata node `/dev/video1` is correctly excluded) | review: odd `/dev/video*` names no longer abort enumeration |
+| Capture via V4L2 → I420, using libraries for conversion | pass | libyuv `ConvertToI420` (MJPEG via libjpeg-turbo); `Camera.CapturesI420FramesWithMonotonicTimestamps` | — |
+| Mode choice per PLAN §5.2 | pass | 720p15 → MJPEG on both cameras (raw YUYV at 720p tops out at 10 fps); integrated camera 30 → 15 by even dropping | review: zero-rate S_PARM, aspect tie-break, and the effective rate (not the requested one) passed downstream |
+| Each camera encoded once, N viewers | pass | browser: 2 tabs → encoding 40 frames/s total (10+15+15) while 80 frames/s go out; 0 packets lost | — |
+| Camera runs without viewers (PLAN §15) | pass | `/api/stats` with 0 viewers: captured ≈ encoded on both cameras | — |
+| Output correctness | pass | Logitech mean luma 82 in our pipeline vs 87 from ffmpeg. The integrated camera is black in both (ffmpeg 8): covered by the privacy shutter, not a pipeline bug | — |
+| Access control | pass | wrong token → HTTP 403; token constant-time compared, never logged; binds to 127.0.0.1 by default | — |
+| CLI robustness | pass | `--size 1280` rejected; numbers must be digits and within range | review finding 7 |
+| No orphan device on setup failure | pass | encoder created before the camera node is adopted | review finding 8 |
+| Busy camera in tests | pass | EBUSY → `ResourceExhausted` → test skips | review finding 2 |
+| Memory / thread safety | pass | ASan+UBSan 40/40 (+ 12 s `camera_viewer` run, both cameras); TSan 2/2 × 40 | — |
+| Test fix found during verification | pass | the capture test held every frame, exhausting the 4-buffer pool (published 4, dropped 95) | test now consumes frames like a real consumer |
+| Unplug → DeviceLost, other cameras continue | unresolved | needs a physical unplug | owner to verify |
+| Windows | unresolved | EME-004 (same `camera.hpp` interface) | — |
+
+Remaining review items, not fixed: one camera failing at `STREAMON` stops the whole app (low severity); no pixel-content assertion in tests
+(a covered camera is legitimately black).

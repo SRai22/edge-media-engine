@@ -27,6 +27,14 @@ class MediaGraph {
     return ref;
   }
 
+  // For nodes created by a factory that can fail (e.g. CameraSource::open).
+  template <class N>
+  N& adopt(std::unique_ptr<N> node) {
+    N& ref = *node;
+    nodes_.push_back(std::move(node));
+    return ref;
+  }
+
   Result connect(Node& from, Node& to);
   Result start();
   void stop() noexcept;

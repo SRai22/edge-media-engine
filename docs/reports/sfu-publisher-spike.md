@@ -68,6 +68,13 @@ Host: Intel(R) Core(TM) i7-8550U CPU @ 1.80GHz · 2026-11-21 22:17 · stripped s
 | Keyframe requests reaching encoder (per cam) | 7 [7–7] | 10 [10–10] | 10 [10–10] |
 | Forced keyframes (per cam, 70 s) | 7 [7–7] | 8 [8–8] | 8 [8–8] |
 
+## Update: Ingress is not needed (2026-11-21, smoke test)
+livekit-server v1.13.11 serves WHIP natively at `/whip/v1` (`pkg/service/whipservice.go`), authenticated by a normal
+LiveKit join token as the Bearer token. The unchanged `WhipPublisher` published there directly: 2 tracks decoded, PLI forwarded
+(2 PLIs → 2 forced keyframes), late joiner's first frame 83 ms after connect. This was one run, not re-measured with the full harness.
+For WHIP, Ingress therefore adds only a stream-key indirection. The SFU can be a single `livekit-server` process (native
+Windows/Linux/macOS binaries exist), with no Redis, no Ingress and no Docker required.
+
 ## Reading the numbers
 - **Encode once holds on both paths.** Encoded/captured = 1.000 with 1, 2 and 10 viewers. Viewers never add encoder work.
 - **CPU is a tie** (~0.9 cores), dominated by the two OpenH264 encoders. Server CPU is a tie as well.

@@ -6,6 +6,16 @@ for what is built, and [tickets/](tickets/) for the roadmap.
 
 **Status:** Milestone 1 (media core) and direct WebRTC peers (EME-008), on synthetic media with OpenH264. Windows capture, hardware encoding and the SFU publisher are not built yet.
 
+## Try it: every camera on this machine in the browser (Linux)
+
+```bash
+./build-vcpkg/camera_viewer            # add --test-pattern for an extra synthetic camera
+```
+Open the printed `http://127.0.0.1:8640/?token=…` URL. Each camera is encoded once with H.264; every extra browser tab is
+another WebRTC viewer of the same encoded streams (the page shows the viewer count and per-camera encoded frames).
+Options: `--size 1280x720 --fps 15 --bitrate 1200000 --port 8640 --max-viewers 4 --listen 127.0.0.1`. Your user must be
+in the `video` group. `camera_probe` prints each camera's capture modes as JSON. Windows support: EME-004.
+
 ## Build: core only (Linux, system packages)
 
 ```bash

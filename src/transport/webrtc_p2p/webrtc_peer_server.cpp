@@ -93,7 +93,7 @@ Result WebRtcPeerServer::start() {
   try {
     signaling_ = std::make_unique<rtc::WebSocketServer>(ws);
   } catch (const std::exception& e) {
-    return fail(ErrorCode::Unsupported, name() + ": signaling server failed: " + e.what());
+    return fail(ErrorCode::Unsupported, name() + ": signaling server on port " + std::to_string(ws.port) + " failed: " + e.what());
   }
   {
     std::lock_guard lock(m_);
