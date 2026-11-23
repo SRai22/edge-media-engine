@@ -152,3 +152,23 @@ Review method: Linux build and tests (no Windows machine or cross-compiler here)
 Review findings fixed: 1 (Strawberry Perl's pkg-config shadowing the Windows OpenH264 fallback), 2 (`wil` string out-params via `.put()`), 3 (explicit
 `objbase.h`/WRL/`<atomic>`/`<functional>` includes), 4, 6, 8 (log before the worker starts), 10 (mid-stream type change → reopen with the original type).
 Not changed: 9 (a loss injected while already lost fires after reconnect: same as Linux), 5/7/11 (notes, no defect), 12 (no stall watchdog: same as Linux).
+
+---
+
+# Verification report: EME-003 (JSON configuration loading) · 2026-11-22
+
+Review method: unit tests (plain + ASan/UBSan), `synthetic_streamer` runs with and without `--config`, a build with
+`-DEME_WITH_CONFIG=OFF`, and an independent Sonnet reviewer (read-only, 10 findings).
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Uses nlohmann/json, no hand-written parser | pass | `src/config/engine_config.cpp` (`json::parse`, comments allowed); `find_package(nlohmann_json 3.11 …)` | review #6: version floor for `find(string_view)` |
+| `loadConfig(path)` → `std::expected<EngineConfig, Error>` | pass | `include/eme/config/engine_config.hpp`; `Config.ShippedExampleLoads`, `Config.MissingFileIsAnError` | — |
+| Every field validated at load, error names the field path | pass | 50 `Fields/ConfigRejects` cases: each field's type, range, even sizes, enum values, unknown keys, duplicate names/ids, required names | review #10: added bool/null/oversized-unsigned/non-object/upper-bound cases |
+| Accepted values are accepted by the nodes | pass | `Config.AcceptedExtremesStart` (4×4@1 and 7680×4320@240 start) | review #1: 2×2 passed the loader but failed the source (min now 4) |
+| Resource bounds | pass | frame pool capped at 512 MiB per source; bitrate 10 kbps–100 Mbps | review #2/#3: 7680×4320×64 pool (3.2 GB) or a 134 MB mock frame were accepted |
+| Node names unambiguous | pass | `/` rejected in pipeline/sink names; sink `h264` rejected | review #4 |
+| `synthetic_streamer --config file.json` builds its graph | pass | `configs/synthetic_streamer.json` run: 10 nodes, 6 sinks, 0 dependency violations, same output shape as without `--config`; bad file → exit 2 with field path | — |
+| Existing behaviour and builds | pass | Linux 96/96 (42 previous + 54 config); `EME_WITH_CONFIG=OFF` builds, `--config` reports it is unavailable; 0 warnings | — |
+| Windows (MSVC) | unresolved | not built here | runs in the Windows CI job on push |
+| Resource-limit settings from config | unresolved | no resource manager exists yet | EME-009 adds them |

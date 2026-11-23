@@ -20,6 +20,8 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - Verification: `checks.md` · task notes: `sources/task.md`
 
 ## Completed
+- **EME-003 JSON config:** `eme::loadConfig` (nlohmann/json) with field-path errors; `synthetic_streamer --config`;
+  `configs/synthetic_streamer.json`. 96/96 tests, ASan clean, Sonnet review 10 findings → 6 fixed. Branch `feat/eme-003-json-config`.
 - **EME-002 / Milestone 1 (media core):** done on synthetic media. 23/23 tests pass on plain, ASan+UBSan and TSan builds
   (repeated 10×). The demo runs 2 sources → 2 encoders → 3 sinks each, with slow sinks dropping and recovering and 0 dependency violations.
 - Independent review: 4 of 6 findings fixed, 2 ticketed (checks.md).

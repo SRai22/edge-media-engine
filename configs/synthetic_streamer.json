@@ -1,0 +1,26 @@
+// Reference topology (same as running synthetic_streamer without --config): 2 sources -> 2 encoders -> 3 sinks each.
+// Fields left out take their defaults; unknown fields are rejected.
+{
+  "pipelines": [
+    {
+      "name": "cam0",
+      "source": { "width": 1280, "height": 720, "fps": 15, "pattern": "moving-bar" },
+      "encoder": { "bitrateBps": 1200000, "keyframeIntervalFrames": 30 },
+      "sinks": [
+        { "name": "p2p" },
+        { "name": "sfu" },
+        { "name": "slow", "queueCapacity": 2, "perFrameDelayMs": 150 }
+      ]
+    },
+    {
+      "name": "cam1",
+      "source": { "width": 1280, "height": 720, "fps": 15, "pattern": "moving-bar" },
+      "encoder": { "bitrateBps": 1200000, "keyframeIntervalFrames": 30 },
+      "sinks": [
+        { "name": "p2p" },
+        { "name": "sfu" },
+        { "name": "slow", "queueCapacity": 2, "perFrameDelayMs": 150 }
+      ]
+    }
+  ]
+}

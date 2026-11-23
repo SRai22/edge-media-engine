@@ -20,12 +20,18 @@ in the `video` group. Unplugging a camera pauses its tile; plugging it back in r
 ## Build: core only (Linux, system packages)
 
 ```bash
-sudo apt install cmake g++ libspdlog-dev libgtest-dev
+sudo apt install cmake g++ libspdlog-dev libgtest-dev nlohmann-json3-dev
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j
 (cd build && ctest --output-on-failure)
 ./build/synthetic_streamer 5
+./build/synthetic_streamer 5 --config configs/synthetic_streamer.json   # topology from JSON
 ```
-Add `-DEME_WITH_WEBRTC=OFF -DEME_WITH_OPENH264=OFF` if the vcpkg dependencies below are not installed.
+Add `-DEME_WITH_WEBRTC=OFF -DEME_WITH_OPENH264=OFF -DEME_WITH_CAMERA=OFF` if the vcpkg dependencies below are not installed
+(and `-DEME_WITH_CONFIG=OFF` without nlohmann/json, which disables `--config`).
+
+`configs/synthetic_streamer.json` documents the config format: a list of pipelines, each one source → one encoder → N sinks.
+Every field is checked when the file loads, and errors name the field, e.g. `pipelines[1].encoder.bitrateBps: must be in [10000, 100000000]`.
+Unknown fields are rejected and missing ones take their defaults.
 
 ## Build: full (vcpkg: libdatachannel, OpenH264, nlohmann/json)
 
