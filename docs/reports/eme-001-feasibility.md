@@ -52,12 +52,37 @@ Notes:
 **Milestone 0 exit criterion met:** both cameras capture simultaneously and produce decodable H.264 through NV12 + Quick Sync.
 With no camera-native H.264, the ADR-006 choice is NV12 + hardware encode by default.
 
+## 30 fps run
+
+Same build and device, `feasibility_probe.exe --seconds 60 --fps 30`. Full report: [`eme-001-20261123-30fps.json`](eme-001-20261123-30fps.json).
+
+| | 15 fps | 30 fps |
+|---|---|---|
+| Two concurrent HW sessions | 2/2, 75/75 frames | 2/2, 150/150 frames |
+| Negotiated | NV12 1280×720 @15 | NV12 1280×720 @30 (both cameras) |
+| HW: captured / dropped | 902, 901 / 0 | 1828, 1827 / 0 |
+| HW: encoded, kbps | 893, 892 · 1196, 1194 | 1788, 1790 · 1196, 1198 |
+| HW: process CPU (% of machine) | 1.9 % | 4.5 % |
+| HW: GPU (this process) | VideoDecode 5.0 %, 3D 1.5 % | VideoDecode 10.1 %, 3D 2.9 % |
+| OpenH264: encoded, kbps | 900, 899 · 376, 1133 | 1800, 1799 · 483, 1190 |
+| OpenH264: process CPU (% of machine) | 5.1 % | 11.3 % |
+| System CPU (hw / OpenH264 run) | 28.2 % / 23.6 % | 29.5 % / 38.4 % |
+| Peak working set | 141 MB | 144 MB |
+
+ffprobe at 30 fps: `capture_hw_0/1` 1788 / 1790 frames, `capture_openh264_0/1` 1800 / 1799, `session_0/1` 150 / 150; all
+Constrained Baseline 1280×720.
+
+`camera_viewer --fps 30` (OpenH264) with Edge on the device, one viewer, `/api/stats` sampled 10 s apart: each camera
+captured and encoded ~31 frames/s, 0 dropped, no device loss; 63 frames/s sent to the viewer (2 tracks); the page shows
+"live" with video. Viewer process CPU 22.6 % of machine, working set 65 MB. OpenH264 warned of ~21 fps input during the
+first seconds, then kept pace.
+
 ## EME-004 hardware checks (runbook §3)
 
 | check | result |
 |---|---|
 | 1. Capabilities from the real device | pass: `camera_probe` lists both cameras with modes (YUY2 up to 1920×1080, NV12/MJPG 640×360–1920×1080, 30/15 fps) |
 | 2. Camera tests ran on hardware | pass: `eme_tests.exe` 96/96, 0 skipped; `Camera.CapturesI420FramesWithMonotonicTimestamps`, `Camera.SecondSourceCannotClaimTheSameCamera`, `Camera.ResumesAfterDeviceLoss` passed |
-| 3. Two cameras at 720p15 in the browser | not run (needs a browser on the device); the probe shows both cameras capturing NV12 720p15 together |
+| 3. Two cameras in the browser | run at 30 fps (above): Edge on the device plays, ~31 fps encoded per camera, 0 dropped. Both tiles not visually confirmed (screenshot shows the first tile only) |
 | 4–6. Unplug / replug same and other port | not run (needs someone at the device) |
 | 7. No leaks across replug | not run |
