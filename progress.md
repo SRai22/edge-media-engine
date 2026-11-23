@@ -10,7 +10,7 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 
 | Milestone | State |
 |---|---|
-| 0 Feasibility | **In progress (EME-001):** probe + runbook written, CI-built; waiting for the device run |
+| 0 Feasibility | **Exit criterion met (EME-001, 2026-11-23):** 2 cameras → 2 Quick Sync sessions, decodable; ADR-006 pending |
 | 1 Media core | Done (EME-002), incl. JSON config (EME-003) |
 | 2 Windows camera + HW encode | MF camera done (EME-004; hardware rows open). D3D11 buffers (EME-005) and MF H.264 encoder (EME-006) not started |
 | 3 SFU publisher | Spikes done (EME-014/015/016); waiting for the owner's ADR-005 decision (WHIP recommended), then EME-007 |
@@ -38,6 +38,9 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
   Static vcpkg triplet (`x64-windows-static-md`) + app-local VC++ runtime (#4).
 - **EME-003:** JSON config with field-path errors; 96/96 Linux, ASan clean.
 
+- **EME-001 device run (2026-11-23):** no camera-native H.264; NV12 + Quick Sync: 2/2 sessions, ~1195 kbps, 1.9 % CPU vs 5.1 %
+  for OpenH264; all outputs decode. Probe async-MFT fix `766e491`. Report: `docs/reports/eme-001-feasibility.md`.
+
 ## Decisions
 - Custom bounded keyframe-aware queue (ADR-002); static typed DAG (ADR-003); libdatachannel + OpenH264, no GPL x264 (ADR-004).
 - Keyframe requests rate-limited per encoder (default 500 ms).
@@ -47,13 +50,13 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 
 ## Open issues
 - Owner decision pending: ADR-005 (WHIP vs SDK) blocks EME-007.
-- EME-004 hardware rows (two cameras at 720p15, unplug/replug on Windows) unresolved until the device run (runbook §3).
-- Confirm the LNK4098 (`MSVCRTD`) warning is gone in Windows CI after the OpenH264 lib fix.
+- EME-004 hardware rows still open: both viewer tiles not visually confirmed; removal/return not run. Cameras are built in, so runbook §3.4–3.7 simulates removal with PnP disable/enable.
+- Device has no build tools: build on a Windows PC, copy `build-win-static\Release\*.exe,*.dll` to the device and run there.
 - Not tested: WebRTC under real loss, SFU + P2P together, bitrate on real content, 24 h stress.
 - Installed outside the repo (Linux dev box): `~/vcpkg`, `~/.local/bin/nasm`, `~/deps/livekit-sdk`, `~/deps/lk`, LiveKit Docker images.
 
 ## Next action
-Device agent runs `docs/runbooks/eme-001-device.md` on the Windows i3 and commits the report (branch `device/eme-001-results`).
-From its numbers: write ADR-006 (camera-native H.264 vs NV12 + HW encode) with the owner, then start EME-006 (MF hardware
-H.264 encoder as `IVideoEncoder`, from the probe's `MftEncoder` prototype) followed by EME-005 (D3D11 zero-copy).
+Owner: write ADR-006 from `docs/reports/eme-001-feasibility.md` (evidence points to NV12 + hardware encode), then start EME-006
+(MF hardware H.264 encoder as `IVideoEncoder`, from the probe's `MftEncoder`; keep one ProcessOutput per HaveOutput) and EME-005
+(D3D11 zero-copy). Device agent runs runbook §3.4–3.7 (PnP disable/enable + leak cycles, elevated, owner OK first).
 In parallel once the owner accepts ADR-005: EME-007 (production WHIP publisher).

@@ -1,0 +1,801 @@
+{
+  "built": "Nov 23 2026",
+  "cameras": [
+    {
+      "bus": "usb\\vid_2574&pid_0560&mi_00\\7&34420b8d&0&0000",
+      "emeConvertibleModes": 23,
+      "id": "\\\\?\\usb#vid_2574&pid_0560&mi_00#7&34420b8d&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}\\global",
+      "name": "TDOC_STB_FIXED",
+      "nativeH264": false,
+      "nativeTypes": [
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 360,
+          "width": 640
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 480,
+          "width": 640
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 448,
+          "width": 800
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 600,
+          "width": 800
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 720,
+          "width": 1280
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 960,
+          "width": 1280
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 1080,
+          "width": 1920
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 360,
+          "width": 640
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 480,
+          "width": 640
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 448,
+          "width": 800
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 600,
+          "width": 800
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 720,
+          "width": 1280
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 960,
+          "width": 1280
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 1080,
+          "width": 1920
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 360,
+          "width": 640
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 480,
+          "width": 640
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 448,
+          "width": 800
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 600,
+          "width": 800
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 540,
+          "width": 960
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 720,
+          "width": 1280
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 960,
+          "width": 1280
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 900,
+          "width": 1600
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 1080,
+          "width": 1920
+        }
+      ]
+    },
+    {
+      "bus": "usb\\vid_2574&pid_055f&mi_00\\7&228089ac&0&0000",
+      "emeConvertibleModes": 23,
+      "id": "\\\\?\\usb#vid_2574&pid_055f&mi_00#7&228089ac&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}\\global",
+      "name": "TDOC_STB_PTZ",
+      "nativeH264": false,
+      "nativeTypes": [
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 360,
+          "width": 640
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 480,
+          "width": 640
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 448,
+          "width": 800
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 600,
+          "width": 800
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 720,
+          "width": 1280
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 960,
+          "width": 1280
+        },
+        {
+          "format": "MJPG",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 1080,
+          "width": 1920
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 360,
+          "width": 640
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 480,
+          "width": 640
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 448,
+          "width": 800
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 600,
+          "width": 800
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 720,
+          "width": 1280
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 960,
+          "width": 1280
+        },
+        {
+          "format": "NV12",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 1080,
+          "width": 1920
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 360,
+          "width": 640
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 480,
+          "width": 640
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 448,
+          "width": 800
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 600,
+          "width": 800
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 540,
+          "width": 960
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 720,
+          "width": 1280
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 960,
+          "width": 1280
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 900,
+          "width": 1600
+        },
+        {
+          "format": "YUY2",
+          "fps": [
+            30.0,
+            15.0
+          ],
+          "height": 1080,
+          "width": 1920
+        }
+      ]
+    }
+  ],
+  "captureEncode": [
+    {
+      "cameras": 2,
+      "encoder": "hw",
+      "perCamera": [
+        {
+          "async": true,
+          "camera": "TDOC_STB_FIXED",
+          "capture": {
+            "deviceLost": false,
+            "framesCaptured": 902,
+            "framesDropped": 0,
+            "framesPublished": 894
+          },
+          "codecApi": {
+            "bFrames": {
+              "readBack": 0,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "forceKeyFrameSupported": true,
+            "gopSize": {
+              "readBack": 30,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "lowLatency": {
+              "readBack": true,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "meanBitrate": {
+              "readBack": 1200000,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "rateControlCBR": {
+              "readBack": 0,
+              "setResult": "0x00000000",
+              "supported": true
+            }
+          },
+          "encode": {
+            "bytes": 9003055,
+            "firstOutputLatencyMs": 328.3366,
+            "framesIn": 893,
+            "framesOut": 893,
+            "kbps": 1195.5432576194203,
+            "keyframes": 30
+          },
+          "file": "capture_hw_0.h264",
+          "name": "IntelÂ® Quick Sync Video H.264 Encoder MFT",
+          "negotiated": "NV12 1280x720 @15 fps (emitting 15)",
+          "profile": 66,
+          "skippedFramesWrongSize": 0
+        },
+        {
+          "async": true,
+          "camera": "TDOC_STB_PTZ",
+          "capture": {
+            "deviceLost": false,
+            "framesCaptured": 901,
+            "framesDropped": 0,
+            "framesPublished": 893
+          },
+          "codecApi": {
+            "bFrames": {
+              "readBack": 0,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "forceKeyFrameSupported": true,
+            "gopSize": {
+              "readBack": 30,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "lowLatency": {
+              "readBack": true,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "meanBitrate": {
+              "readBack": 1200000,
+              "setResult": "0x00000000",
+              "supported": true
+            },
+            "rateControlCBR": {
+              "readBack": 0,
+              "setResult": "0x00000000",
+              "supported": true
+            }
+          },
+          "encode": {
+            "bytes": 8987707,
+            "firstOutputLatencyMs": 331.5063,
+            "framesIn": 892,
+            "framesOut": 892,
+            "kbps": 1193.505149675179,
+            "keyframes": 30
+          },
+          "file": "capture_hw_1.h264",
+          "name": "IntelÂ® Quick Sync Video H.264 Encoder MFT",
+          "negotiated": "NV12 1280x720 @15 fps (emitting 15)",
+          "profile": 66,
+          "skippedFramesWrongSize": 0
+        }
+      ],
+      "resources": {
+        "gpu": {
+          "allProcesses": {
+            "": 0.0,
+            "3D": 17.887575240148117,
+            "Copy": 0.0,
+            "GDI Render": 0.0,
+            "LegacyOverlay": 0.0,
+            "VideoDecode": 5.015539112914221,
+            "VideoProcessing": 0.0
+          },
+          "note": "average over samples of the summed Utilization Percentage per engine type",
+          "samples": 60,
+          "thisProcess": {
+            "": 0.0,
+            "3D": 1.5182886310505184,
+            "Copy": 0.0,
+            "GDI Render": 0.0,
+            "LegacyOverlay": 0.0,
+            "VideoDecode": 5.015358357402033,
+            "VideoProcessing": 0.0
+          }
+        },
+        "peakWorkingSetMB": 140.91796875,
+        "privateMB": 118.9609375,
+        "processCpuCores": 0.07417737551984833,
+        "processCpuPercentOfMachine": 1.8544343879962082,
+        "seconds": 60.2441104,
+        "systemCpuPercent": 28.150933609958507,
+        "workingSetMB": 124.64453125
+      }
+    },
+    {
+      "cameras": 2,
+      "encoder": "openh264",
+      "perCamera": [
+        {
+          "camera": "TDOC_STB_FIXED",
+          "capture": {
+            "deviceLost": false,
+            "framesCaptured": 901,
+            "framesDropped": 0,
+            "framesPublished": 901
+          },
+          "encode": {
+            "bytes": 2820827,
+            "firstOutputLatencyMs": 90.1595,
+            "framesIn": 900,
+            "framesOut": 900,
+            "kbps": 376.07811700203786,
+            "keyframes": 30
+          },
+          "file": "capture_openh264_0.h264",
+          "negotiated": "NV12 1280x720 @15 fps (emitting 15)"
+        },
+        {
+          "camera": "TDOC_STB_PTZ",
+          "capture": {
+            "deviceLost": false,
+            "framesCaptured": 901,
+            "framesDropped": 0,
+            "framesPublished": 901
+          },
+          "encode": {
+            "bytes": 8498491,
+            "firstOutputLatencyMs": 75.3529,
+            "framesIn": 901,
+            "framesOut": 901,
+            "kbps": 1133.0352739245498,
+            "keyframes": 31
+          },
+          "file": "capture_openh264_1.h264",
+          "negotiated": "NV12 1280x720 @15 fps (emitting 15)"
+        }
+      ],
+      "resources": {
+        "gpu": {
+          "allProcesses": {
+            "": 0.0,
+            "3D": 17.44598062464103,
+            "Copy": 0.0,
+            "GDI Render": 0.0,
+            "LegacyOverlay": 0.0,
+            "VideoDecode": 0.0,
+            "VideoProcessing": 0.0
+          },
+          "note": "average over samples of the summed Utilization Percentage per engine type",
+          "samples": 60
+        },
+        "peakWorkingSetMB": 140.91796875,
+        "privateMB": 49.83984375,
+        "processCpuCores": 0.20571158106930632,
+        "processCpuPercentOfMachine": 5.142789526732658,
+        "seconds": 60.0051292,
+        "systemCpuPercent": 23.594116115594897,
+        "workingSetMB": 62.5234375
+      }
+    }
+  ],
+  "captureOpen": [
+    {
+      "camera": "TDOC_STB_FIXED",
+      "negotiated": "NV12 1280x720 @15 fps (emitting 15)"
+    },
+    {
+      "camera": "TDOC_STB_PTZ",
+      "negotiated": "NV12 1280x720 @15 fps (emitting 15)"
+    }
+  ],
+  "concurrentSessions": {
+    "concurrentSessionsWorking": 2,
+    "framesPerSession": 75,
+    "sessions": [
+      {
+        "async": true,
+        "codecApi": {
+          "bFrames": {
+            "readBack": 0,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "forceKeyFrameSupported": true,
+          "gopSize": {
+            "readBack": 30,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "lowLatency": {
+            "readBack": true,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "meanBitrate": {
+            "readBack": 1200000,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "rateControlCBR": {
+            "readBack": 0,
+            "setResult": "0x00000000",
+            "supported": true
+          }
+        },
+        "file": "session_0.h264",
+        "name": "IntelÂ® Quick Sync Video H.264 Encoder MFT",
+        "profile": 66,
+        "result": {
+          "bytes": 599470,
+          "firstOutputLatencyMs": 142.6967,
+          "framesIn": 75,
+          "framesOut": 75,
+          "keyframes": 3
+        }
+      },
+      {
+        "async": true,
+        "codecApi": {
+          "bFrames": {
+            "readBack": 0,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "forceKeyFrameSupported": true,
+          "gopSize": {
+            "readBack": 30,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "lowLatency": {
+            "readBack": true,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "meanBitrate": {
+            "readBack": 1200000,
+            "setResult": "0x00000000",
+            "supported": true
+          },
+          "rateControlCBR": {
+            "readBack": 0,
+            "setResult": "0x00000000",
+            "supported": true
+          }
+        },
+        "file": "session_1.h264",
+        "name": "IntelÂ® Quick Sync Video H.264 Encoder MFT",
+        "profile": 66,
+        "result": {
+          "bytes": 599470,
+          "firstOutputLatencyMs": 111.3395,
+          "framesIn": 75,
+          "framesOut": 75,
+          "keyframes": 3
+        }
+      }
+    ],
+    "sessionsRequested": 2,
+    "wallSeconds": 1.4198059
+  },
+  "encoders": {
+    "hardware": [
+      {
+        "hardwareUrl": "AA243E5D-2F73-48c7-97F7-F6FA17651651",
+        "hardwareVendorId": "VEN_8086",
+        "name": "IntelÂ® Quick Sync Video H.264 Encoder MFT"
+      },
+      {
+        "hardwareUrl": "AA243E5D-2F73-48c7-97F7-F6FA17651651",
+        "hardwareVendorId": "VEN_8086",
+        "name": "IntelÂ® Quick Sync Video H.264 Encoder MFT"
+      }
+    ],
+    "software": [
+      {
+        "hardwareUrl": "",
+        "hardwareVendorId": "",
+        "name": "H264 Encoder MFT"
+      }
+    ]
+  },
+  "options": {
+    "bitrate": 1200000,
+    "fps": 15,
+    "height": 720,
+    "seconds": 60,
+    "width": 1280
+  },
+  "probe": "EME-001 feasibility_probe",
+  "system": {
+    "cpu": {
+      "logicalProcessors": 4,
+      "name": "11th Gen Intel(R) Core(TM) i3-1115G4E @ 3.00GHz"
+    },
+    "gpus": [
+      {
+        "dedicatedVideoMemoryMB": 128,
+        "description": "Intel(R) UHD Graphics",
+        "deviceId": "0x9A78",
+        "software": false,
+        "vendorId": "0x8086"
+      },
+      {
+        "dedicatedVideoMemoryMB": 0,
+        "description": "Microsoft Basic Render Driver",
+        "deviceId": "0x008C",
+        "software": true,
+        "vendorId": "0x1414"
+      }
+    ],
+    "os": {
+      "build": "19044",
+      "displayVersion": "21H2",
+      "editionId": "IoTEnterpriseS",
+      "productName": "Windows 10 IoT Enterprise LTSC 2021"
+    }
+  }
+}

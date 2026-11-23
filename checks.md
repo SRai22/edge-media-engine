@@ -137,14 +137,14 @@ Review method: Linux build and tests (no Windows machine or cross-compiler here)
 | Compiles on Windows (MSVC) and all tests pass, camera tests skipped | pass | CI run [45120302046](https://github.com/SRai22/edge-media-engine/actions/runs/45120302046) (windows-latest, `x64-windows-static-md`): 42/42, the 4 hardware camera tests skipped (no camera), `Camera.OpenRejectsBadConfigAndMissingDevice` passed; 0 compiler warnings; owner: builds and runs on their Windows machine | first main run failed before compiling (GitHub 503 on a vcpkg spdlog patch download); `x64-windows` hit LNK2005 with libdatachannel's DLL, so the static triplet is used (#4); Release linked OpenH264's debug lib (LNK4098 `MSVCRTD` ×3), fixed by finding the release and debug libs separately — confirm on the next CI run |
 | Linux still green after the shared-helper refactor | pass | `build/`: 42/42 with both real cameras attached (no skips), 0 compiler warnings | — |
 | Enumeration: `MFEnumDeviceSources`, id = symbolic link, name = friendly name, bus = device instance | pass (source) | `listDevices()`, `instanceFromLink()` | — |
-| Capabilities from the real device report | pass (source) / unresolved (hardware) | native types of the first video stream grouped into `CameraMode`s (`listModes`) | needs `camera_probe.exe` on a real camera |
+| Capabilities from the real device report | pass | device run 2026-11-23: `camera_probe` lists both cameras with YUY2/NV12/MJPG modes up to 1920×1080 at 30/15 fps | — |
 | Mode choice: closest size, then NV12 > I420 > YUY2 > UYVY > MJPG reaching the rate | pass (source) | `kPreference` + shared `chooseMode` (same code path as Linux) | — |
 | Async `IMFSourceReader`; callback never blocks | pass (review) | callback only converts into a pool buffer, publishes (non-blocking) and re-issues `ReadSample`; teardown gate is lock-free on the callback side (`busy_`/`owner_`) | review: gate first used `try_lock`, which would stall capture when `OnEvent` and `OnReadSample` overlapped; replaced before review |
 | libyuv `ConvertToI420` + `FramePool` | pass (source) | contiguous buffer + `minBytes` length guard | — |
 | Timestamps on `steady_clock`, monotonic across reconnects | pass (source) | MF time anchored per reader; falls back to arrival time if the driver's time does not advance | review #6 (frozen sample times would drop every frame) |
-| Unplug → clean DeviceLost, no leaks; rediscover same camera by name + bus with claim registry | unresolved (hardware) | `MF_SOURCE_READERF_ERROR`/failed status/`MEVideoCaptureDeviceRemoved` → `deviceLost`; worker shuts the source down (RAII `wil::com_ptr`), reconnect mirrors Linux rules | owner: physical unplug/replug on Windows |
-| `simulateDeviceLossForTesting` | unresolved (hardware) | `Camera.ResumesAfterDeviceLoss` runs only with a camera | owner: run `ctest` on the Windows box with a camera |
-| 720p15 from each real camera (two cameras) | unresolved (hardware) | — | owner steps in progress.md |
+| Unplug → clean DeviceLost, no leaks; rediscover same camera by name + bus with claim registry | unresolved (hardware; the cameras are built in, so no physical unplug: runbook §3.4–3.7 now simulates removal with `Disable-PnpDevice`) | `MF_SOURCE_READERF_ERROR`/failed status/`MEVideoCaptureDeviceRemoved` → `deviceLost`; worker shuts the source down (RAII `wil::com_ptr`), reconnect mirrors Linux rules | owner: run runbook §3.4–3.7 (PnP disable/enable, 20-cycle leak check) |
+| `simulateDeviceLossForTesting` | pass | device run 2026-11-23: `eme_tests.exe` 96/96, 0 skipped, incl. `Camera.ResumesAfterDeviceLoss`, `Camera.SecondSourceCannotClaimTheSameCamera`, `Camera.CapturesI420FramesWithMonotonicTimestamps` | — |
+| 720p15 from each real camera (two cameras) | pass (capture) / unresolved (browser) | feasibility probe: both cameras NV12 1280×720 @15 together, 0 dropped over 60 s | `camera_viewer` in a browser on the device not run (runbook §3.3) |
 | WIL for COM RAII; COM/MF init per thread | pass (source) | `wil::com_ptr_nothrow`, `wil::unique_cotaskmem_*`, WRL `RuntimeClass` for the callback; process-wide `CoIncrementMTAUsage` + `MFStartup` once, worker joins MTA via `wil::CoInitializeEx_failfast` | — |
 | Runs with Media Foundation present but no camera | pass | CI: `Install-WindowsFeature Server-Media-Foundation` succeeded with no restart needed, `camera_probe.exe` printed `[]`, camera tests skipped | — |
 | Runs where Media Foundation is absent (IoT package removed, N editions, Server) | pass (source) / unresolved | MF DLLs delay-loaded; `platform()` probes them, then `enumerateCameras()` is empty and `open()` returns DeviceLost. CI installs MF, so this path is not exercised there | owner: try on an image without the MF package if the IoT build removes it |
@@ -184,12 +184,12 @@ following `docs/runbooks/eme-001-device.md`.
 | requirement | verdict | evidence | correction |
 |---|---|---|---|
 | Probe app: cameras (all native types incl. H.264), encoder MFTs, two HW sessions, 2× capture + 2× encode, CPU/GPU/memory, JSON report | pass (source) | `apps/feasibility_probe/main.cpp`; report saved after every phase | — |
-| Builds with MSVC and runs on a machine without camera/GPU encoder | unresolved | CI step "Feasibility probe smoke run" | runs on push |
+| Builds with MSVC and runs on the target | pass | built locally (VS 2022, static-md Release) and run on the Windows IoT i3-1115G4E; CI smoke run on push | first device run: HW sessions 0 frames out (`ProcessOutput 0x8000FFFF`): async MFT called twice per HaveOutput after a stream change; fixed `766e491` |
 | Device runbook with exact commands and pass criteria | pass | `docs/runbooks/eme-001-device.md`, `tools/windows/eme001.ps1` | — |
-| Camera capability report from the real device | unresolved | — | device run (runbook §2) |
-| Hardware encoder report incl. two concurrent sessions | unresolved | — | device run |
-| Measured CPU/GPU for 2× capture + 2× encode (hw vs OpenH264) | unresolved | — | device run |
-| ADR: camera-native H.264 vs NV12 + HW encode | unresolved | — | after the device run, with the owner (runbook §4) |
+| Camera capability report from the real device | pass | 2 cameras, 23 native types each, 1280×720 in NV12/MJPG/YUY2; no camera-native H.264 ([device report](docs/reports/eme-001-feasibility.md)) | — |
+| Hardware encoder report incl. two concurrent sessions | pass | Intel Quick Sync H.264 MFT; 2/2 sessions, 75/75 frames each; CBR/1.2 Mbps/GOP 30/low latency/0 B-frames read back, baseline profile | — |
+| Measured CPU/GPU for 2× capture + 2× encode (hw vs OpenH264) | pass | process CPU 1.9 % (hw) vs 5.1 % (OpenH264) of machine; 141 MB peak; ~1195 kbps per camera on hw; all 6 outputs decode in ffprobe at 1280×720 | PDH has no `VideoEncode` engine here; hw run shows 5 % `VideoDecode` |
+| ADR: camera-native H.264 vs NV12 + HW encode | unresolved | evidence ready: no native H.264 on either camera, NV12 + Quick Sync works for 2 cameras | owner writes ADR-006 |
 
 Review findings fixed: 1 (OpenH264 payload accessor: compile error), 2 (`strmiids` for CODECAPI GUIDs), 3 (MFStartup failure is
 recorded, exit 0), 4 (camera graph destroyed before `MFShutdown`), 5 (measurement window ended at the deadline; kbps over the
