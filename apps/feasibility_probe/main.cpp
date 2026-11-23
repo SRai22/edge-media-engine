@@ -441,7 +441,9 @@ class MftEncoder {
       HRESULT r = mft_->GetOutputAvailableType(out_, 0, t.put());
       if (SUCCEEDED(r)) r = mft_->SetOutputType(out_, t.get(), 0);
       if (SUCCEEDED(r)) r = mft_->GetOutputStreamInfo(out_, &outInfo_);
-      return FAILED(r) ? r : pull(sink, s);  // the pending output is still there
+      if (FAILED(r)) return r;
+      // Async MFTs allow one ProcessOutput per METransformHaveOutput (else E_UNEXPECTED); they signal the output again.
+      return async_ ? S_OK : pull(sink, s);
     }
     if (FAILED(h)) return h;
     com_ptr_nothrow<IMFMediaBuffer> data;

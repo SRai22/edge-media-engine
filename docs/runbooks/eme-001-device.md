@@ -1,6 +1,6 @@
 # Runbook: EME-001 feasibility + EME-004 camera checks on the Windows target
 
-For the agent (or person) working **on the target device**: Windows IoT, Intel Core i3 13th gen, two USB cameras.
+For the agent (or person) working **on the target device**: Windows IoT, Intel Core i3 (device run: 11th gen i3-1115G4E), two USB cameras.
 The code was written and CI-built on Linux with no access to this hardware. Your job is to run it here and record
 what actually happens. Never invent or estimate numbers: if something fails, record the failure.
 
