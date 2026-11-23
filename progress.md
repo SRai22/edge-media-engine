@@ -36,7 +36,6 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - libdatachannel + OpenH264 via a pinned vcpkg manifest. libx264 rejected (GPL). LiveKit's SDK is not needed for P2P (ADR-004).
 
 ## Open issues
-- Windows/MSVC build and vcpkg manifest unverified (EME-012).
 - JSON config not implemented. nlohmann/json is now a dependency (EME-003).
 - Hardware work (EME-001, 004–006) needs the target device.
 - Not tested: WebRTC under real loss (netem), SFU + P2P together, bitrate on real content.
@@ -52,11 +51,12 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 
 - **EME-004 Windows camera (Media Foundation):** `src/sources/windows_mf/camera_mf.cpp` implements `camera.hpp`; shared
   helpers in `src/sources/camera_common.hpp` (Linux backend now uses them, 42/42). Windows CI workflow `.github/workflows/windows.yml`.
-  Sonnet review: 12 findings, 7 fixed. MF DLLs are delay-loaded so apps run without Media Foundation. Not compiled yet: CI runs on push.
+  Sonnet review: 12 findings, 7 fixed. MF DLLs are delay-loaded so apps run without Media Foundation. Windows CI 42/42 (run 45120302046) after the static-triplet fix (#4).
 
 ## Next action
-EME-004: push the branch (owner approval) so Windows CI compiles it; fix any MSVC errors/warnings it reports; update checks.md.
-Then owner hardware steps on the Windows box (see README "Build: Windows"): `camera_probe.exe` lists both cameras with modes;
-`ctest` with a camera attached (capture + simulated-loss tests run, not skipped); `camera_viewer.exe` shows both cameras at 720p15;
-unplug one during capture → its tile pauses, the other continues; replug (same and another port) → resumes, `reconnects` = 1.
+EME-004: Windows build verified (CI 42/42, camera tests skipped; owner build runs). Confirm the next CI run has no LNK4098
+after the OpenH264 release/debug lib fix. Owner hardware steps on the Windows box (README "Build: Windows"): `camera_probe.exe`
+lists both cameras with modes; `ctest` with a camera attached (capture + simulated-loss tests run, not skipped); `camera_viewer.exe`
+shows both cameras at 720p15; unplug one during capture → its tile pauses, the other continues; replug (same and another port) →
+resumes, `reconnects` = 1. Record results in checks.md (EME-004 hardware rows).
 Once ADR-005 is accepted: productionize `WhipPublisher` under EME-007. Otherwise EME-003 (JSON config).

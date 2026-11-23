@@ -46,10 +46,16 @@ if(EME_WITH_OPENH264)
     pkg_check_modules(OPENH264 REQUIRED IMPORTED_TARGET openh264)
   else()  # vcpkg installs openh264 with a .pc file only; a pkg-config on PATH (e.g. Strawberry Perl's) won't see it
     find_path(OPENH264_INCLUDE_DIR wels/codec_api.h REQUIRED)
-    find_library(OPENH264_LIBRARY NAMES openh264 REQUIRED)
+    # Release and debug libs share a name; a plain search picked debug/lib for Release (LNK4098 MSVCRTD conflict).
+    set(_vcpkg_triplet_dir "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    find_library(OPENH264_LIBRARY_RELEASE openh264 PATHS "${_vcpkg_triplet_dir}/lib" NO_DEFAULT_PATH REQUIRED)
+    find_library(OPENH264_LIBRARY_DEBUG openh264 PATHS "${_vcpkg_triplet_dir}/debug/lib" NO_DEFAULT_PATH)
     add_library(PkgConfig::OPENH264 UNKNOWN IMPORTED)
-    set_target_properties(PkgConfig::OPENH264 PROPERTIES IMPORTED_LOCATION ${OPENH264_LIBRARY}
+    set_target_properties(PkgConfig::OPENH264 PROPERTIES IMPORTED_LOCATION ${OPENH264_LIBRARY_RELEASE}
                           INTERFACE_INCLUDE_DIRECTORIES ${OPENH264_INCLUDE_DIR})
+    if(OPENH264_LIBRARY_DEBUG)
+      set_target_properties(PkgConfig::OPENH264 PROPERTIES IMPORTED_LOCATION_DEBUG ${OPENH264_LIBRARY_DEBUG})
+    endif()
   endif()
   add_library(eme_openh264 src/processing/encoder/openh264_encoder.cpp)
   add_library(eme::openh264 ALIAS eme_openh264)

@@ -114,7 +114,7 @@ ffmpeg as an independent reference, unit and integration tests, sanitizers, and 
 | Memory / thread safety | pass | ASan+UBSan 40/40 (+ 12 s `camera_viewer` run, both cameras); TSan 2/2 × 40 | — |
 | Test fix found during verification | pass | the capture test held every frame, exhausting the 4-buffer pool (published 4, dropped 95) | test now consumes frames like a real consumer |
 | Unplug → paused, other cameras continue; replug → resumes | pass | physical test: Logitech lost 23:29:28, back 23:29:43 via `/dev/video2` (was `/dev/video3`); viewer never reloaded, 15 fps, 0 loss, 0 freezes; `Camera.ResumesAfterDeviceLoss` (simulated loss) | added reconnect (2026-11-21). After review fixes: moved to another USB port (4.3 → 2), lost 23:34:33, back 23:34:46, viewer kept decoding (0 loss, 0 freezes) |
-| Windows | unresolved | EME-004 (same `camera.hpp` interface) | — |
+| Windows | pass (build) | EME-004 report below: CI 42/42 on windows-latest; hardware rows tracked there | — |
 
 Reconnect review (Sonnet): wrong-camera matching (bus-only, name fallback stealing another source's camera) fixed by requiring name + bus
 (bus may differ only if the camera is the sole one with that name), a process-wide claim registry, a sysfs-based candidate scan, and
@@ -129,12 +129,12 @@ Remaining review items, not fixed: one camera failing at `STREAMON` stops the wh
 # Verification report: EME-004 (Windows Media Foundation camera source) · 2026-11-21
 
 Review method: Linux build and tests (no Windows machine or cross-compiler here), an independent Sonnet reviewer
-(read-only, 12 findings), and Windows CI (`.github/workflows/windows.yml`, windows-latest, MSVC `/W4 /permissive-`, vcpkg manifest at the pinned baseline).
+(read-only, 12 findings), the owner's Windows machine (builds and runs, 2026-11-22), and Windows CI (`.github/workflows/windows.yml`, windows-latest, MSVC `/W4 /permissive-`, vcpkg manifest at the pinned baseline).
 
 | requirement | verdict | evidence | correction |
 |---|---|---|---|
 | Same `camera.hpp` contract; `camera_viewer`/`camera_probe` unchanged | pass (source) | `src/sources/windows_mf/camera_mf.cpp`; no app/test source changes; mode choice, claims, effective fps, config validation shared with V4L2 via `src/sources/camera_common.hpp` | — |
-| Compiles on Windows (MSVC) and all tests pass, camera tests skipped | unresolved | CI not run yet: needs the branch pushed | — |
+| Compiles on Windows (MSVC) and all tests pass, camera tests skipped | pass | CI run [45120302046](https://github.com/SRai22/edge-media-engine/actions/runs/45120302046) (windows-latest, `x64-windows-static-md`): 42/42, the 4 hardware camera tests skipped (no camera), `Camera.OpenRejectsBadConfigAndMissingDevice` passed; 0 compiler warnings; owner: builds and runs on their Windows machine | first main run failed before compiling (GitHub 503 on a vcpkg spdlog patch download); `x64-windows` hit LNK2005 with libdatachannel's DLL, so the static triplet is used (#4); Release linked OpenH264's debug lib (LNK4098 `MSVCRTD` ×3), fixed by finding the release and debug libs separately — confirm on the next CI run |
 | Linux still green after the shared-helper refactor | pass | `build/`: 42/42 with both real cameras attached (no skips), 0 compiler warnings | — |
 | Enumeration: `MFEnumDeviceSources`, id = symbolic link, name = friendly name, bus = device instance | pass (source) | `listDevices()`, `instanceFromLink()` | — |
 | Capabilities from the real device report | pass (source) / unresolved (hardware) | native types of the first video stream grouped into `CameraMode`s (`listModes`) | needs `camera_probe.exe` on a real camera |
@@ -146,7 +146,8 @@ Review method: Linux build and tests (no Windows machine or cross-compiler here)
 | `simulateDeviceLossForTesting` | unresolved (hardware) | `Camera.ResumesAfterDeviceLoss` runs only with a camera | owner: run `ctest` on the Windows box with a camera |
 | 720p15 from each real camera (two cameras) | unresolved (hardware) | — | owner steps in progress.md |
 | WIL for COM RAII; COM/MF init per thread | pass (source) | `wil::com_ptr_nothrow`, `wil::unique_cotaskmem_*`, WRL `RuntimeClass` for the callback; process-wide `CoIncrementMTAUsage` + `MFStartup` once, worker joins MTA via `wil::CoInitializeEx_failfast` | — |
-| Runs where Media Foundation is absent (IoT package removed, N editions, Server) | pass (source) / unresolved (CI) | MF DLLs delay-loaded; `platform()` probes them, then `enumerateCameras()` is empty and `open()` returns DeviceLost | — |
+| Runs with Media Foundation present but no camera | pass | CI: `Install-WindowsFeature Server-Media-Foundation` succeeded with no restart needed, `camera_probe.exe` printed `[]`, camera tests skipped | — |
+| Runs where Media Foundation is absent (IoT package removed, N editions, Server) | pass (source) / unresolved | MF DLLs delay-loaded; `platform()` probes them, then `enumerateCameras()` is empty and `open()` returns DeviceLost. CI installs MF, so this path is not exercised there | owner: try on an image without the MF package if the IoT build removes it |
 
 Review findings fixed: 1 (Strawberry Perl's pkg-config shadowing the Windows OpenH264 fallback), 2 (`wil` string out-params via `.put()`), 3 (explicit
 `objbase.h`/WRL/`<atomic>`/`<functional>` includes), 4, 6, 8 (log before the worker starts), 10 (mid-stream type change → reopen with the original type).
