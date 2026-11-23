@@ -197,3 +197,37 @@ measured time), 6 (output pulled again after a stream change), 7 (frame size che
 Not changed: 9 (first-output latency in camera runs includes the frame wait: documented in the runbook), 10 (`.put()` on WIL
 strings already compiles in `camera_mf.cpp`), 12 (PDH per-process GPU instances: verify on the device, runbook notes the fallback).
 Known limit: the probe links Media Foundation directly (no delay-load), so it needs MF installed.
+
+---
+
+# Verification report: EME-006 (Media Foundation hardware H.264 encoder) · 2026-11-23
+
+Review method: written on Linux (no Windows compiler or Intel encoder); Linux build + tests for the shared parts; independent
+Sonnet reviewer (read-only); Windows CI compiles it and runs the tests (encoder tests skip: no GPU on the runner). Hardware
+results come from the device agent following `docs/runbooks/eme-006-device.md`.
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| `MfH264Encoder : IVideoEncoder` over the async hardware MFT | pass (source) | `src/processing/encoder/mf_h264_encoder.cpp`: events via `BeginGetEvent` queued to the encode thread; one `ProcessInput` per `METransformNeedInput`, one `ProcessOutput` per `METransformHaveOutput` (EME-001 device lesson) | — |
+| `ICodecAPI`: low latency, CBR, bitrate, GOP, 0 B-frames, Baseline; read back and logged | pass (source) / unresolved (device) | `configure()` + `readBack()`, `MfEncoderInfo`; warning when a setting is not accepted | device: runbook §1 test + §2 log line |
+| Forced keyframe via `CODECAPI_AVEncVideoForceKeyFrame`, ≤ 2 frames | unresolved (device) | `MfH264Encoder.EncodesDecodableBaselineWithForcedKeyframe` checks the index | device: runbook §1 |
+| Forced keyframes rate-limited (min interval, configurable) | pass | already in `EncoderNode` (`minKeyframeInterval`, default 500 ms) for every encoder | — |
+| SPS/PPS into `CodecConfiguration`, `version` bumped on change | pass (Linux, parser) / unresolved (device) | `include/eme/processing/h264_annexb.hpp`, `H264AnnexB.*` 2/2 on Linux; encoder sets `codecConfig` on keyframes | device: runbook §1 |
+| Output decodes (decoder + browser) | unresolved (device) | test decodes every output with OpenH264 and checks each frame's barcode against its own capture time | device: runbook §1, §2 |
+| Two sessions concurrently on the target | unresolved (device) | `MfH264Encoder.TwoSessionsConcurrently`; `camera_viewer --encoder mf` with both cameras | device: runbook §1, §2 |
+| Open failure → `Unsupported`; software fallback | pass (source) | `create()` returns `Unsupported` without MF or a hardware MFT; `camera_viewer --encoder auto` (default) falls back to OpenH264 with a warning, `--encoder mf` fails instead | resource-policy-driven fallback waits for EME-009 |
+| Linux still green | pass | `build/`: 98/98 (96 + 2 new `H264AnnexB` tests), 0 compiler warnings | — |
+| Builds with MSVC `/W4`, Windows tests pass/skip | unresolved | Windows CI on push | — |
+| Independent review | pass | Sonnet reviewer: 7 findings, all fixed (below) | — |
+
+Review findings fixed: 1 (`<strmif.h>` for `ICodecAPI`: compile error), 2 (a failed or stalled session now fails every later
+`encode()` at once instead of blocking 2 s each time), 3 (wait for this frame's output, not for the next input request: one frame
+of latency), 4 (event callback stops re-arming at teardown; `ReleasesSessionsOnDestroy` checks sessions are freed on the device),
+5 (a forced keyframe whose `SetValue` fails is retried, and counted only after `ProcessInput` succeeds), 6 (requested profile,
+bitrate, rate and size reapplied after a stream change, settings read back again), 7 (SPS/PPS fallback from
+`MF_MT_MPEG_SEQUENCE_HEADER`). Not changed: test 8 (read-back assertions fail rather than skip if an MFT has no `GetValue`:
+on the target that is a real finding).
+
+Known limits: one system-memory buffer and an I420→NV12 copy per frame (`shortcut:` comment; EME-005 moves to D3D11 surfaces);
+only hardware MFTs are tried (all are async; no synchronous path); a dead session makes `EncoderNode` log a warning per frame
+(no automatic restart or fallback mid-stream yet: EME-010).

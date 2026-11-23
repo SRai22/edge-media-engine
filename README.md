@@ -4,7 +4,7 @@ A small C++23 media runtime: capture once, encode once per rendition, and fan ou
 over bounded, keyframe-aware queues. See [PLAN.md](PLAN.md) for the full specification, [docs/architecture.md](docs/architecture.md)
 for what is built, and [tickets/](tickets/) for the roadmap.
 
-**Status:** Milestone 1 (media core) and direct WebRTC peers (EME-008), on synthetic media with OpenH264. Camera capture on Linux (V4L2) and Windows (Media Foundation), with automatic resume after unplug/replug; Windows builds and passes tests in CI. Hardware encoding and the production SFU publisher are not built yet.
+**Status:** Milestone 1 (media core) and direct WebRTC peers (EME-008), on synthetic media with OpenH264. Camera capture on Linux (V4L2) and Windows (Media Foundation), with automatic resume after unplug/replug; Windows builds and passes tests in CI. Hardware H.264 through Media Foundation (Intel Quick Sync) is written and waiting for its device run; the production SFU publisher is not built yet.
 
 ## Try it: every camera on this machine in the browser
 
@@ -15,7 +15,7 @@ Open the printed `http://127.0.0.1:8640/?token=…` URL. Each camera is encoded 
 another WebRTC viewer of the same encoded streams (the page shows the viewer count and per-camera encoded frames).
 Options: `--size 1280x720 --fps 15 --bitrate 1200000 --port 8640 --max-viewers 4 --listen 127.0.0.1`. On Linux your user must be
 in the `video` group. Unplugging a camera pauses its tile; plugging it back in resumes the stream automatically.
-`camera_probe` prints each camera's capture modes as JSON. On Windows run `build-win\Release\camera_viewer.exe` (build steps below).
+`camera_probe` prints each camera's capture modes as JSON. On Windows run `build-win\Release\camera_viewer.exe` (build steps below). On Windows it encodes with the hardware encoder when one is available and falls back to OpenH264; `--encoder mf` or `--encoder openh264` forces one.
 
 ## Build: core only (Linux, system packages)
 

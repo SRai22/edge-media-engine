@@ -1,7 +1,9 @@
 // Example: every camera on this machine -> one H.264 encode each -> any number of browser tabs.
 //
 //   camera_viewer [--size 1280x720] [--fps 15] [--bitrate 1200000] [--port 8640] [--listen 127.0.0.1]
-//                 [--max-viewers 4] [--test-pattern] [--seconds N]
+//                 [--max-viewers 4] [--test-pattern] [--seconds N] [--encoder auto|mf|openh264]
+//
+// --encoder auto (default): the Media Foundation hardware encoder where available (Windows), else OpenH264.
 //
 // Open the printed URL. Each extra tab is another WebRTC viewer of the same encoded streams; /api/stats shows
 // that the encoded frame count does not grow with viewers.
@@ -22,6 +24,9 @@
 #include "eme/core/graph.hpp"
 #include "eme/processing/encoder_node.hpp"
 #include "eme/processing/openh264_encoder.hpp"
+#ifdef EME_HAVE_MF_ENCODER
+#include "eme/processing/mf_h264_encoder.hpp"
+#endif
 #include "eme/sources/camera.hpp"
 #include "eme/sources/synthetic_video_source.hpp"
 #include "eme/transport/webrtc_peer_server.hpp"
@@ -37,6 +42,7 @@ struct Options {
   int width = 1280, height = 720, fps = 15, port = 8640, maxViewers = 4, seconds = 0;
   std::uint32_t bitrate = 1'200'000;
   std::string listen = "127.0.0.1";
+  std::string encoder = "auto";
   bool testPattern = false;
 };
 
@@ -66,6 +72,10 @@ std::optional<Options> parse(int argc, char** argv) {
       else if (a == "--max-viewers") o.maxViewers = static_cast<int>(std::min<long long>(num(next().value()), 64));
       else if (a == "--seconds") o.seconds = static_cast<int>(std::min<long long>(num(next().value()), 86400 * 365));
       else if (a == "--test-pattern") o.testPattern = true;
+      else if (a == "--encoder") {
+        o.encoder = next().value();
+        if (o.encoder != "auto" && o.encoder != "mf" && o.encoder != "openh264") return std::nullopt;
+      }
       else return std::nullopt;
     } catch (const std::exception&) {
       return std::nullopt;
@@ -97,7 +107,7 @@ struct Stream {
 int main(int argc, char** argv) {
   const auto opt = parse(argc, argv);
   if (!opt) {
-    spdlog::error("usage: {} [--size WxH] [--fps N] [--bitrate bps] [--port N] [--listen ADDR] [--max-viewers N] [--test-pattern] [--seconds N]", argv[0]);
+    spdlog::error("usage: {} [--size WxH] [--fps N] [--bitrate bps] [--port N] [--listen ADDR] [--max-viewers N] [--test-pattern] [--seconds N] [--encoder auto|mf|openh264]", argv[0]);
     return 2;
   }
   const std::string token = randomToken();
@@ -107,11 +117,25 @@ int main(int argc, char** argv) {
                                        .bindAddress = opt->listen, .accessToken = token,
                                        .maxPeers = static_cast<std::size_t>(opt->maxViewers)});
   std::vector<Stream> streams;
-  auto makeEncoder = [&](const VideoFormat& f) {
-    return OpenH264Encoder::create({.width = f.width, .height = f.height, .fps = f.fps, .bitrateBps = opt->bitrate,
-                                    .keyframeIntervalFrames = f.fps * 2});
+  auto makeEncoder = [&](const VideoFormat& f) -> std::expected<std::unique_ptr<IVideoEncoder>, Error> {
+    const EncoderConfig c{.width = f.width, .height = f.height, .fps = f.fps, .bitrateBps = opt->bitrate,
+                          .keyframeIntervalFrames = f.fps * 2};
+#ifdef EME_HAVE_MF_ENCODER
+    if (opt->encoder != "openh264") {
+      auto hw = MfH264Encoder::create(c);
+      if (hw) return std::unique_ptr<IVideoEncoder>(std::move(*hw));
+      if (opt->encoder == "mf") return std::unexpected(hw.error());
+      spdlog::warn("hardware encoder unavailable ({}); using OpenH264", hw.error().message);
+    }
+#else
+    if (opt->encoder == "mf") return fail(ErrorCode::Unsupported, "built without the Media Foundation encoder");
+#endif
+    auto sw = OpenH264Encoder::create(c);
+    if (!sw) return std::unexpected(sw.error());
+    spdlog::info("encoder: OpenH264 {}x{} @{} fps, {} bps", c.width, c.height, c.fps, c.bitrateBps);
+    return std::unique_ptr<IVideoEncoder>(std::move(*sw));
   };
-  auto addEncoder = [&](Node& source, std::unique_ptr<OpenH264Encoder> enc, Stream s) -> bool {
+  auto addEncoder = [&](Node& source, std::unique_ptr<IVideoEncoder> enc, Stream s) -> bool {
     s.encoder = &graph.add<EncoderNode>(s.label + "/h264", std::move(enc));
     for (auto r : {graph.connect(source, *s.encoder), graph.connect(*s.encoder, server)}) {
       if (!r) return spdlog::error("{}: {}", s.label, r.error().message), false;
@@ -169,7 +193,8 @@ int main(int argc, char** argv) {
     nlohmann::json cams = nlohmann::json::array();
     for (const auto& st : streams) {
       const auto es = st.encoder->encoder().stats();
-      nlohmann::json c{{"label", st.label}, {"encoded", es.framesOut}, {"keyframes", es.keyframes}};
+      nlohmann::json c{{"label", st.label}, {"encoded", es.framesOut}, {"keyframes", es.keyframes},
+                       {"encoderInputDropped", st.encoder->inputStats().dropped}};  // frames the encoder fell behind on
       if (st.camera) {
         const auto cs = st.camera->stats();
         c["captured"] = cs.framesCaptured;

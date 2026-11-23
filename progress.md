@@ -12,7 +12,7 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 |---|---|
 | 0 Feasibility | **Exit criterion met (EME-001, 2026-11-23):** 2 cameras → 2 Quick Sync sessions, decodable; ADR-006 pending |
 | 1 Media core | Done (EME-002), incl. JSON config (EME-003) |
-| 2 Windows camera + HW encode | MF camera done (EME-004; hardware rows open). D3D11 buffers (EME-005) and MF H.264 encoder (EME-006) not started |
+| 2 Windows camera + HW encode | MF camera done (EME-004; hardware rows open). MF H.264 encoder (EME-006) written, waiting for CI + device run; D3D11 buffers (EME-005) not started |
 | 3 SFU publisher | Spikes done (EME-014/015/016); waiting for the owner's ADR-005 decision (WHIP recommended), then EME-007 |
 | 4 Direct WebRTC | Done for P2P (EME-008) |
 | 5 Performance/resilience | Camera reconnect done (Linux verified, Windows pending); rest not started (EME-009/010/011) |
@@ -23,7 +23,7 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - Apps: `synthetic_streamer` (+ `--config`, `configs/synthetic_streamer.json`), `webrtc_streamer`, `camera_probe`, `camera_viewer`,
   `feasibility_probe` (Windows only, EME-001), `apps/spikes/**` (off by default)
 - Camera backends: `src/sources/v4l2/` (Linux), `src/sources/windows_mf/` (Windows), shared `src/sources/camera_common.hpp`
-- Device work: `docs/runbooks/eme-001-device.md`, `tools/windows/eme001.ps1`
+- Device work: `docs/runbooks/eme-001-device.md`, `tools/windows/eme001.ps1`, `docs/runbooks/eme-006-device.md`
 - Reports: `docs/reports/sfu-publisher-spike.md` (+ `data/`); EME-001 device report goes to `docs/reports/eme-001-*.{json,md}`
 - Not in git (owner convention): `tickets/`, `PLAN.md`, `docs/design-decisions/` (ADR-001…005)
 - Build trees (Linux): `build-vcpkg/` (+ `-addr`, `-thre` sanitizer trees), `build-spike/`; worktrees use `-DVCPKG_INSTALLED_DIR=<repo>/build-vcpkg/vcpkg_installed`
@@ -56,7 +56,8 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - Installed outside the repo (Linux dev box): `~/vcpkg`, `~/.local/bin/nasm`, `~/deps/livekit-sdk`, `~/deps/lk`, LiveKit Docker images.
 
 ## Next action
-Owner: write ADR-006 from `docs/reports/eme-001-feasibility.md` (evidence points to NV12 + hardware encode), then start EME-006
-(MF hardware H.264 encoder as `IVideoEncoder`, from the probe's `MftEncoder`; keep one ProcessOutput per HaveOutput) and EME-005
-(D3D11 zero-copy). Device agent runs runbook §3.4–3.7 (PnP disable/enable + leak cycles, elevated, owner OK first).
+EME-006 (branch `feat/eme-006-mf-h264-encoder`): fix anything Windows CI reports, then the device agent runs
+`docs/runbooks/eme-006-device.md` (branch `device/eme-006-results`). Owner: write ADR-006 from
+`docs/reports/eme-001-feasibility.md` (evidence points to NV12 + hardware encode). Then EME-005 (D3D11 zero-copy into the MF
+encoder). Device agent also runs eme-001-device.md §3.4–3.7 (PnP disable/enable + leak cycles, elevated, owner OK first).
 In parallel once the owner accepts ADR-005: EME-007 (production WHIP publisher).
