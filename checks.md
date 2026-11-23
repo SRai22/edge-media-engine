@@ -197,3 +197,39 @@ measured time), 6 (output pulled again after a stream change), 7 (frame size che
 Not changed: 9 (first-output latency in camera runs includes the frame wait: documented in the runbook), 10 (`.put()` on WIL
 strings already compiles in `camera_mf.cpp`), 12 (PDH per-process GPU instances: verify on the device, runbook notes the fallback).
 Known limit: the probe links Media Foundation directly (no delay-load), so it needs MF installed.
+
+---
+
+# Verification report: EME-006 (Media Foundation hardware H.264 encoder) · 2026-11-23
+
+Review method: written on Linux (no Windows compiler or Intel encoder); Linux build + tests for the shared parts; independent
+Sonnet reviewer (read-only); Windows CI compiles it and runs the tests (encoder tests skip: no GPU on the runner). Hardware
+results come from the device agent following `docs/runbooks/eme-006-device.md`.
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| `MfH264Encoder : IVideoEncoder` over the async hardware MFT | pass (source) | `src/processing/encoder/mf_h264_encoder.cpp`: events via `BeginGetEvent` queued to the encode thread; one `ProcessInput` per `METransformNeedInput`, one `ProcessOutput` per `METransformHaveOutput` (EME-001 device lesson) | — |
+| `ICodecAPI`: low latency, CBR, bitrate, GOP, 0 B-frames, Baseline; read back and logged | pass | device 2026-11-23: read back profile 66, CBR, 1200000 bps, GOP 30 (test) / 60 (viewer), B-frames 0, low latency true; no warnings ([device report](docs/reports/eme-006-20261123.md)) | — |
+| Forced keyframe via `CODECAPI_AVEncVideoForceKeyFrame`, ≤ 2 frames | pass | device: `MfH264Encoder.EncodesDecodableBaselineWithForcedKeyframe` OK. New-viewer keyframe in the browser not verified | — |
+| Forced keyframes rate-limited (min interval, configurable) | pass | already in `EncoderNode` (`minKeyframeInterval`, default 500 ms) for every encoder | — |
+| SPS/PPS into `CodecConfiguration`, `version` bumped on change | pass | Linux `H264AnnexB.*` 2/2; device: `EncodesDecodableBaselineWithForcedKeyframe` checks SPS/PPS in `codecConfig` | — |
+| Output decodes (decoder + browser) | pass | device: every output decodes in OpenH264 with matching barcodes (test); Edge on the device plays the `--encoder mf` stream | — |
+| Two sessions concurrently on the target | pass | device: `TwoSessionsConcurrently` OK; `camera_viewer --encoder mf --fps 30`: both cameras ~30.7 fps encoded, 0 dropped, `encoderInputDropped` 15/16 at start only; 9.8 % CPU vs 22.6 % OpenH264, 134 MB vs 65 MB | encoder read-back logged twice per camera at start (created twice?): not investigated |
+| Open failure → `Unsupported`; software fallback | pass (source) | `create()` returns `Unsupported` without MF or a hardware MFT; `camera_viewer --encoder auto` (default) falls back to OpenH264 with a warning, `--encoder mf` fails instead | resource-policy-driven fallback waits for EME-009 |
+| Linux still green | pass | `build/`: 98/98 (96 + 2 new `H264AnnexB` tests), 0 compiler warnings | — |
+| Builds with MSVC `/W4`, Windows tests pass/skip | pass (local) | VS 2022 local build, 0 warnings; device 102/102, 4/4 encoder tests run (not skipped). Windows CI not checked | test did not compile: `Run` shadowed by `testing::Test::Run` → renamed `EncodeRun` (`e0e6787`) |
+| Independent review | pass | Sonnet reviewer: 7 findings, all fixed (below) | — |
+| Releases hardware sessions on destroy | pass | device: `ReleasesSessionsOnDestroy` 20 cycles OK | — |
+| Viewer: keyframe on a new viewer, clean Ctrl+C exit | unresolved | not verified on the device (runbook §2.3, §2.5) | someone at the device |
+
+Review findings fixed: 1 (`<strmif.h>` for `ICodecAPI`: compile error), 2 (a failed or stalled session now fails every later
+`encode()` at once instead of blocking 2 s each time), 3 (wait for this frame's output, not for the next input request: one frame
+of latency), 4 (event callback stops re-arming at teardown; `ReleasesSessionsOnDestroy` checks sessions are freed on the device),
+5 (a forced keyframe whose `SetValue` fails is retried, and counted only after `ProcessInput` succeeds), 6 (requested profile,
+bitrate, rate and size reapplied after a stream change, settings read back again), 7 (SPS/PPS fallback from
+`MF_MT_MPEG_SEQUENCE_HEADER`). Not changed: test 8 (read-back assertions fail rather than skip if an MFT has no `GetValue`:
+on the target that is a real finding).
+
+Known limits: one system-memory buffer and an I420→NV12 copy per frame (`shortcut:` comment; EME-005 moves to D3D11 surfaces);
+only hardware MFTs are tried (all are async; no synchronous path); a dead session makes `EncoderNode` log a warning per frame
+(no automatic restart or fallback mid-stream yet: EME-010).
