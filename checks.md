@@ -214,13 +214,14 @@ results come from the device agent following `docs/runbooks/eme-006-device.md`.
 | Forced keyframes rate-limited (min interval, configurable) | pass | already in `EncoderNode` (`minKeyframeInterval`, default 500 ms) for every encoder | — |
 | SPS/PPS into `CodecConfiguration`, `version` bumped on change | pass | Linux `H264AnnexB.*` 2/2; device: `EncodesDecodableBaselineWithForcedKeyframe` checks SPS/PPS in `codecConfig` | — |
 | Output decodes (decoder + browser) | pass | device: every output decodes in OpenH264 with matching barcodes (test); Edge on the device plays the `--encoder mf` stream | — |
-| Two sessions concurrently on the target | pass | device: `TwoSessionsConcurrently` OK; `camera_viewer --encoder mf --fps 30`: both cameras ~30.7 fps encoded, 0 dropped, `encoderInputDropped` 15/16 at start only; 9.8 % CPU vs 22.6 % OpenH264, 134 MB vs 65 MB | encoder read-back logged twice per camera at start (created twice?): not investigated |
+| Two sessions concurrently on the target | pass | device: `TwoSessionsConcurrently` OK; `camera_viewer --encoder mf --fps 30`: both cameras ~30.7 fps encoded, 0 dropped, `encoderInputDropped` 15/16 at start only; 9.8 % CPU vs 22.6 % OpenH264; 134 MB was measured with 2 viewers (OpenH264's 65 MB with 1), so memory is not compared | read-back logged twice per camera: the second line is the re-read after Quick Sync's output-type change, not a second encoder |
 | Open failure → `Unsupported`; software fallback | pass (source) | `create()` returns `Unsupported` without MF or a hardware MFT; `camera_viewer --encoder auto` (default) falls back to OpenH264 with a warning, `--encoder mf` fails instead | resource-policy-driven fallback waits for EME-009 |
 | Linux still green | pass | `build/`: 98/98 (96 + 2 new `H264AnnexB` tests), 0 compiler warnings | — |
 | Builds with MSVC `/W4`, Windows tests pass/skip | pass (local) | VS 2022 local build, 0 warnings; device 102/102, 4/4 encoder tests run (not skipped). Windows CI not checked | test did not compile: `Run` shadowed by `testing::Test::Run` → renamed `EncodeRun` (`e0e6787`) |
 | Independent review | pass | Sonnet reviewer: 7 findings, all fixed (below) | — |
 | Releases hardware sessions on destroy | pass | device: `ReleasesSessionsOnDestroy` 20 cycles OK | — |
-| Viewer: keyframe on a new viewer, clean Ctrl+C exit | unresolved | not verified on the device (runbook §2.3, §2.5) | someone at the device |
+| Viewer: clean Ctrl+C exit | pass | owner at the device: Ctrl+C exits cleanly | — |
+| Viewer: keyframe on a new viewer | unresolved | not confirmed on the device (runbook §2.3) | someone at the device |
 
 Review findings fixed: 1 (`<strmif.h>` for `ICodecAPI`: compile error), 2 (a failed or stalled session now fails every later
 `encode()` at once instead of blocking 2 s each time), 3 (wait for this frame's output, not for the next input request: one frame
