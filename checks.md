@@ -172,3 +172,28 @@ Review method: unit tests (plain + ASan/UBSan), `synthetic_streamer` runs with a
 | Existing behaviour and builds | pass | Linux 96/96 (42 previous + 54 config); `EME_WITH_CONFIG=OFF` builds, `--config` reports it is unavailable; 0 warnings | — |
 | Windows (MSVC) | unresolved | not built here | runs in the Windows CI job on push |
 | Resource-limit settings from config | unresolved | no resource manager exists yet | EME-009 adds them |
+
+---
+
+# Verification report: EME-001 (Milestone 0 feasibility probe) · 2026-11-23
+
+Review method: written on Linux with no Windows compiler or hardware; independent Sonnet reviewer (read-only, 13 findings);
+Windows CI builds the probe and smoke-runs it (no camera/GPU on the runner). Hardware results come from the device agent
+following `docs/runbooks/eme-001-device.md`.
+
+| requirement | verdict | evidence | correction |
+|---|---|---|---|
+| Probe app: cameras (all native types incl. H.264), encoder MFTs, two HW sessions, 2× capture + 2× encode, CPU/GPU/memory, JSON report | pass (source) | `apps/feasibility_probe/main.cpp`; report saved after every phase | — |
+| Builds with MSVC and runs on a machine without camera/GPU encoder | unresolved | CI step "Feasibility probe smoke run" | runs on push |
+| Device runbook with exact commands and pass criteria | pass | `docs/runbooks/eme-001-device.md`, `tools/windows/eme001.ps1` | — |
+| Camera capability report from the real device | unresolved | — | device run (runbook §2) |
+| Hardware encoder report incl. two concurrent sessions | unresolved | — | device run |
+| Measured CPU/GPU for 2× capture + 2× encode (hw vs OpenH264) | unresolved | — | device run |
+| ADR: camera-native H.264 vs NV12 + HW encode | unresolved | — | after the device run, with the owner (runbook §4) |
+
+Review findings fixed: 1 (OpenH264 payload accessor: compile error), 2 (`strmiids` for CODECAPI GUIDs), 3 (MFStartup failure is
+recorded, exit 0), 4 (camera graph destroyed before `MFShutdown`), 5 (measurement window ended at the deadline; kbps over the
+measured time), 6 (output pulled again after a stream change), 7 (frame size checked before libyuv), 8 (drain parameter), 11, 13.
+Not changed: 9 (first-output latency in camera runs includes the frame wait: documented in the runbook), 10 (`.put()` on WIL
+strings already compiles in `camera_mf.cpp`), 12 (PDH per-process GPU instances: verify on the device, runbook notes the fallback).
+Known limit: the probe links Media Foundation directly (no delay-load), so it needs MF installed.

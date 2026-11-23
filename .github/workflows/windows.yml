@@ -48,3 +48,8 @@ jobs:
 
       - name: Probe cameras (expects an empty list on CI)
         run: build/Release/camera_probe.exe
+
+      # Runners have no camera or GPU encoder: this only proves the probe runs and writes its report.
+      - name: Feasibility probe smoke run
+        run: build\Release\feasibility_probe.exe --seconds 2 --out eme001-ci
+        shell: cmd
