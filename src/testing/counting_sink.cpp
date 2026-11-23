@@ -38,6 +38,7 @@ SinkStats CountingSink::stats() const {
 
 void CountingSink::run(std::stop_token st) {
   while (auto frame = input_->pop(st)) {
+    if (config_.beforeFrame) config_.beforeFrame();
     if (config_.perFrameDelay.count() > 0) std::this_thread::sleep_for(config_.perFrameDelay);
     std::lock_guard lock(m_);
     ++stats_.received;

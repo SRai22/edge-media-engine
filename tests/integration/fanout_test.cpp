@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <future>
 #include <thread>
 
 #include "eme/core/graph.hpp"
@@ -28,7 +29,12 @@ TEST(FanOut, SharedEncodeToManyConsumers) {
       EncoderNode::Config{.minKeyframeInterval = std::chrono::milliseconds(0)});  // only frame 0 is a periodic keyframe
   auto& fastA = g.add<CountingSink>("p2p-a", CountingSink::Config{.queueCapacity = 512});
   auto& fastB = g.add<CountingSink>("sfu", CountingSink::Config{.queueCapacity = 512});
-  auto& slow = g.add<CountingSink>("slow", CountingSink::Config{.queueCapacity = 2, .perFrameDelay = 5ms});
+  // The slow sink stalls on its first frame until the producer is done, so its 2-slot queue overflows on any OS
+  // (a sleep-based delay never falls behind when Windows rounds sleeps up to the ~15 ms timer tick). Bounded so a failed test cannot hang.
+  std::promise<void> releaseSlow;
+  auto slowGate = releaseSlow.get_future().share();
+  auto& slow = g.add<CountingSink>(
+      "slow", CountingSink::Config{.queueCapacity = 2, .beforeFrame = [slowGate] { slowGate.wait_for(10s); }});
   ASSERT_TRUE(g.connect(src, enc));
   for (Node* sink : {static_cast<Node*>(&fastA), static_cast<Node*>(&fastB), static_cast<Node*>(&slow)}) {
     ASSERT_TRUE(g.connect(enc, *sink));
@@ -41,6 +47,7 @@ TEST(FanOut, SharedEncodeToManyConsumers) {
     src.emitFrame();
     std::this_thread::sleep_for(500us);
   }
+  releaseSlow.set_value();
   auto& mock = enc.encoder();
   ASSERT_TRUE(test::waitFor([&] {
     const auto s = mock.stats().framesOut;

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -26,6 +27,7 @@ class CountingSink final : public Node, public Consumer<EncodedVideoFrame> {
   struct Config {
     std::size_t queueCapacity = 8;
     std::chrono::microseconds perFrameDelay{0};
+    std::function<void()> beforeFrame;  // runs per frame before it is counted; lets tests stall the sink without timers
   };
 
   CountingSink(std::string name, Config config);
