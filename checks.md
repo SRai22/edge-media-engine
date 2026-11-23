@@ -209,16 +209,18 @@ results come from the device agent following `docs/runbooks/eme-006-device.md`.
 | requirement | verdict | evidence | correction |
 |---|---|---|---|
 | `MfH264Encoder : IVideoEncoder` over the async hardware MFT | pass (source) | `src/processing/encoder/mf_h264_encoder.cpp`: events via `BeginGetEvent` queued to the encode thread; one `ProcessInput` per `METransformNeedInput`, one `ProcessOutput` per `METransformHaveOutput` (EME-001 device lesson) | — |
-| `ICodecAPI`: low latency, CBR, bitrate, GOP, 0 B-frames, Baseline; read back and logged | pass (source) / unresolved (device) | `configure()` + `readBack()`, `MfEncoderInfo`; warning when a setting is not accepted | device: runbook §1 test + §2 log line |
-| Forced keyframe via `CODECAPI_AVEncVideoForceKeyFrame`, ≤ 2 frames | unresolved (device) | `MfH264Encoder.EncodesDecodableBaselineWithForcedKeyframe` checks the index | device: runbook §1 |
+| `ICodecAPI`: low latency, CBR, bitrate, GOP, 0 B-frames, Baseline; read back and logged | pass | device 2026-11-23: read back profile 66, CBR, 1200000 bps, GOP 30 (test) / 60 (viewer), B-frames 0, low latency true; no warnings ([device report](docs/reports/eme-006-20261123.md)) | — |
+| Forced keyframe via `CODECAPI_AVEncVideoForceKeyFrame`, ≤ 2 frames | pass | device: `MfH264Encoder.EncodesDecodableBaselineWithForcedKeyframe` OK. New-viewer keyframe in the browser not verified | — |
 | Forced keyframes rate-limited (min interval, configurable) | pass | already in `EncoderNode` (`minKeyframeInterval`, default 500 ms) for every encoder | — |
-| SPS/PPS into `CodecConfiguration`, `version` bumped on change | pass (Linux, parser) / unresolved (device) | `include/eme/processing/h264_annexb.hpp`, `H264AnnexB.*` 2/2 on Linux; encoder sets `codecConfig` on keyframes | device: runbook §1 |
-| Output decodes (decoder + browser) | unresolved (device) | test decodes every output with OpenH264 and checks each frame's barcode against its own capture time | device: runbook §1, §2 |
-| Two sessions concurrently on the target | unresolved (device) | `MfH264Encoder.TwoSessionsConcurrently`; `camera_viewer --encoder mf` with both cameras | device: runbook §1, §2 |
+| SPS/PPS into `CodecConfiguration`, `version` bumped on change | pass | Linux `H264AnnexB.*` 2/2; device: `EncodesDecodableBaselineWithForcedKeyframe` checks SPS/PPS in `codecConfig` | — |
+| Output decodes (decoder + browser) | pass | device: every output decodes in OpenH264 with matching barcodes (test); Edge on the device plays the `--encoder mf` stream | — |
+| Two sessions concurrently on the target | pass | device: `TwoSessionsConcurrently` OK; `camera_viewer --encoder mf --fps 30`: both cameras ~30.7 fps encoded, 0 dropped, `encoderInputDropped` 15/16 at start only; 9.8 % CPU vs 22.6 % OpenH264, 134 MB vs 65 MB | encoder read-back logged twice per camera at start (created twice?): not investigated |
 | Open failure → `Unsupported`; software fallback | pass (source) | `create()` returns `Unsupported` without MF or a hardware MFT; `camera_viewer --encoder auto` (default) falls back to OpenH264 with a warning, `--encoder mf` fails instead | resource-policy-driven fallback waits for EME-009 |
 | Linux still green | pass | `build/`: 98/98 (96 + 2 new `H264AnnexB` tests), 0 compiler warnings | — |
-| Builds with MSVC `/W4`, Windows tests pass/skip | unresolved | Windows CI on push | — |
+| Builds with MSVC `/W4`, Windows tests pass/skip | pass (local) | VS 2022 local build, 0 warnings; device 102/102, 4/4 encoder tests run (not skipped). Windows CI not checked | test did not compile: `Run` shadowed by `testing::Test::Run` → renamed `EncodeRun` (`e0e6787`) |
 | Independent review | pass | Sonnet reviewer: 7 findings, all fixed (below) | — |
+| Releases hardware sessions on destroy | pass | device: `ReleasesSessionsOnDestroy` 20 cycles OK | — |
+| Viewer: keyframe on a new viewer, clean Ctrl+C exit | unresolved | not verified on the device (runbook §2.3, §2.5) | someone at the device |
 
 Review findings fixed: 1 (`<strmif.h>` for `ICodecAPI`: compile error), 2 (a failed or stalled session now fails every later
 `encode()` at once instead of blocking 2 s each time), 3 (wait for this frame's output, not for the next input request: one frame

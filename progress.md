@@ -12,7 +12,7 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 |---|---|
 | 0 Feasibility | **Exit criterion met (EME-001, 2026-11-23):** 2 cameras → 2 Quick Sync sessions, decodable; ADR-006 pending |
 | 1 Media core | Done (EME-002), incl. JSON config (EME-003) |
-| 2 Windows camera + HW encode | MF camera done (EME-004; hardware rows open). MF H.264 encoder (EME-006) written, waiting for CI + device run; D3D11 buffers (EME-005) not started |
+| 2 Windows camera + HW encode | MF camera done (EME-004; hardware rows open). MF H.264 encoder (EME-006) passes on the device (2026-11-23; viewer keyframe/Ctrl+C checks open); D3D11 buffers (EME-005) not started |
 | 3 SFU publisher | Spikes done (EME-014/015/016); waiting for the owner's ADR-005 decision (WHIP recommended), then EME-007 |
 | 4 Direct WebRTC | Done for P2P (EME-008) |
 | 5 Performance/resilience | Camera reconnect done (Linux verified, Windows pending); rest not started (EME-009/010/011) |
@@ -56,8 +56,8 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 - Installed outside the repo (Linux dev box): `~/vcpkg`, `~/.local/bin/nasm`, `~/deps/livekit-sdk`, `~/deps/lk`, LiveKit Docker images.
 
 ## Next action
-EME-006 (branch `feat/eme-006-mf-h264-encoder`): fix anything Windows CI reports, then the device agent runs
-`docs/runbooks/eme-006-device.md` (branch `device/eme-006-results`). Owner: write ADR-006 from
+EME-006: device run done (`docs/reports/eme-006-20261123.md`); open: keyframe on a new viewer, clean Ctrl+C, encoder
+created twice per camera at start, memory 134 MB vs 65 MB. Merge after Windows CI is green. Owner: write ADR-006 from
 `docs/reports/eme-001-feasibility.md` (evidence points to NV12 + hardware encode). Then EME-005 (D3D11 zero-copy into the MF
 encoder). Device agent also runs eme-001-device.md §3.4–3.7 (PnP disable/enable + leak cycles, elevated, owner OK first).
 In parallel once the owner accepts ADR-005: EME-007 (production WHIP publisher).
