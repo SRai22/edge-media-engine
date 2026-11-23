@@ -26,14 +26,14 @@ namespace {
   ASSERT_TRUE(var##_created) << var##_created.error().message;                         \
   auto& var = **var##_created
 
-struct Run {
+struct EncodeRun {
   std::vector<EncodedVideoFrame> out;
   std::vector<std::int64_t> inputCaptureNs;
 };
 
 // Encodes `frames` textured 720p frames stamped with their capture time; requests a keyframe before frame `forceAt`.
-Run encodeFrames(MfH264Encoder& enc, PixelFormat format, int frames, int forceAt) {
-  Run run;
+EncodeRun encodeFrames(MfH264Encoder& enc, PixelFormat format, int frames, int forceAt) {
+  EncodeRun run;
   SyntheticVideoSource src("cam", SyntheticSourceConfig{.pixelFormat = format, .manualClock = true,
                                                         .pattern = SyntheticPattern::MovingTexture, .timestampBarcode = true});
   EXPECT_TRUE(src.start());
@@ -129,7 +129,7 @@ TEST(MfH264Encoder, EncodesDecodableBaselineWithForcedKeyframe) {
 TEST(MfH264Encoder, TwoSessionsConcurrently) {
   CREATE_OR_SKIP(a, EncoderConfig{});
   CREATE_OR_SKIP(b, EncoderConfig{});
-  Run ra, rb;
+  EncodeRun ra, rb;
   {
     std::jthread ta([&] { ra = encodeFrames(a, PixelFormat::I420, 45, -1); });
     std::jthread tb([&] { rb = encodeFrames(b, PixelFormat::I420, 45, -1); });
