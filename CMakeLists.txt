@@ -130,13 +130,20 @@ if(EME_BUILD_APPS)
     target_include_directories(camera_viewer PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_link_libraries(camera_viewer PRIVATE eme::camera eme::webrtc eme::openh264 httplib::httplib nlohmann_json::nlohmann_json)
   endif()
+  if(WIN32 AND EME_WITH_CAMERA AND EME_WITH_OPENH264)  # EME-001: run on the target device (docs/runbooks/eme-001-device.md)
+    find_package(nlohmann_json CONFIG REQUIRED)
+    add_executable(feasibility_probe apps/feasibility_probe/main.cpp)
+    target_link_libraries(feasibility_probe PRIVATE eme::camera eme::openh264 nlohmann_json::nlohmann_json yuv WIL::WIL
+                          mfplat mf mfuuid strmiids dxgi pdh psapi ole32 oleaut32)  # strmiids: CODECAPI_* GUIDs
+    target_compile_options(feasibility_probe PRIVATE ${EME_WARNINGS})
+  endif()
   if(EME_WITH_WEBRTC AND EME_WITH_OPENH264)
     add_executable(webrtc_streamer apps/webrtc_streamer/main.cpp)
     target_link_libraries(webrtc_streamer PRIVATE eme::webrtc eme::openh264)
   endif()
   if(MSVC)  # app-local VC++ runtime: older machines ship an outdated system MSVCP140.dll that crashes these binaries
     include(InstallRequiredSystemLibraries)
-    foreach(app synthetic_streamer camera_probe camera_viewer webrtc_streamer)
+    foreach(app synthetic_streamer camera_probe camera_viewer webrtc_streamer feasibility_probe)
       if(TARGET ${app})
         add_custom_command(TARGET ${app} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
                            ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} $<TARGET_FILE_DIR:${app}>)

@@ -69,3 +69,5 @@ Testing/
 build-vcpkg/
 spikes/livekit/.run/
 spikes/sfu_eval/results/
+eme001-out/
+eme001-ci/
