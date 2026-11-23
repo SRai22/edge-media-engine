@@ -84,5 +84,5 @@ first seconds, then kept pace.
 | 1. Capabilities from the real device | pass: `camera_probe` lists both cameras with modes (YUY2 up to 1920×1080, NV12/MJPG 640×360–1920×1080, 30/15 fps) |
 | 2. Camera tests ran on hardware | pass: `eme_tests.exe` 96/96, 0 skipped; `Camera.CapturesI420FramesWithMonotonicTimestamps`, `Camera.SecondSourceCannotClaimTheSameCamera`, `Camera.ResumesAfterDeviceLoss` passed |
 | 3. Two cameras in the browser | run at 30 fps (above): Edge on the device plays, ~31 fps encoded per camera, 0 dropped. Both tiles not visually confirmed (screenshot shows the first tile only) |
-| 4–6. Unplug / replug same and other port | not run (needs someone at the device) |
-| 7. No leaks across replug | not run |
+| 4–6. Removal and return | not run. The cameras are built into the device, so they can't be unplugged; runbook §3.4–3.6 now uses `Disable-PnpDevice` / `Enable-PnpDevice`. Other-port test not applicable |
+| 7. No leaks across removal | not run (runbook §3.7: 20 disable/enable cycles) |

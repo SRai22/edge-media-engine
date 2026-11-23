@@ -76,13 +76,38 @@ Use the same build. Each check maps to an unresolved row in `checks.md` (EME-004
    ```
    Record each camera's negotiated format (console line `<camera>: NV12 1280x720 @30 fps (emitting 15) …` at start) and
    encoded frames per second (`encoded` in `/api/stats`, sampled twice 10 s apart).
-4. **Unplug during capture:** with the viewer open, unplug camera A. Expect: A's tile pauses, B keeps playing,
-   the console logs `camera lost`, `/api/stats` shows A with `"deviceLost": true`. No crash.
-5. **Replug, same port:** plug A back in. Within ~2 s the console logs `camera back`, the tile resumes without reloading
-   the page, `reconnects` = 1.
-6. **Replug, another port:** repeat 4–5 using a different USB port. Expect the same (reconnects = 2).
-7. **No leaks:** in Task Manager (Details → camera_viewer.exe), note memory before step 4 and after step 6, with the stream
-   running for a minute each time. Memory returns to roughly the same level.
+The cameras are wired inside the embedded device, so physical unplugging isn't possible. Steps 4–7 simulate the removal by
+disabling the camera's PnP device instead. Windows tears the device down for applications just as it would on a removal, and
+Media Foundation raises `MEVideoCaptureDeviceRemoved`. This changes device state, so ask the owner first. It needs an
+**elevated** PowerShell. The instance id stays the same, so this tests rediscovery by name + bus, not a move to another port.
+
+```powershell
+$cam = Get-PnpDevice -Class Camera -PresentOnly | Where-Object FriendlyName -eq 'TDOC_STB_FIXED'   # camera A, exactly one row
+$cam | Format-List FriendlyName, InstanceId, Status                                               # check it is the right one
+$stats = "<the printed URL, with /api/stats instead of />"                                        # keep ?token=…
+$vw = { (Get-Process camera_viewer).WorkingSet64 / 1MB }
+```
+
+4. **Removal during capture:** with the viewer open, run `Disable-PnpDevice -InstanceId $cam.InstanceId -Confirm:$false`.
+   Expect: A's tile pauses, B keeps playing, the console logs `camera lost`, and `Invoke-RestMethod $stats` shows A with
+   `"deviceLost": true`. No crash.
+5. **Return:** `Enable-PnpDevice -InstanceId $cam.InstanceId -Confirm:$false`. Within ~2 s the console logs `camera back`,
+   the tile resumes without reloading the page, and `reconnects` = 1.
+6. **Other port:** not applicable (fixed wiring). Instead, repeat 4–5 on camera B (`TDOC_STB_PTZ`) and check that A keeps playing.
+7. **No leaks:** with the stream running, record `& $vw`, then cycle camera A 20 times and record it again after a minute:
+   ```powershell
+   & $vw
+   1..20 | ForEach-Object {
+     Disable-PnpDevice -InstanceId $cam.InstanceId -Confirm:$false; Start-Sleep 3
+     Enable-PnpDevice  -InstanceId $cam.InstanceId -Confirm:$false; Start-Sleep 5
+   }
+   Start-Sleep 60; & $vw; Invoke-RestMethod $stats | ConvertTo-Json -Depth 5
+   ```
+   Pass: `reconnects` for A went up by 20, both tiles play, and the working set is within a few MB of the first reading.
+   If a cycle leaves A disabled (the script was stopped), run `Enable-PnpDevice` again before finishing.
+
+If `Disable-PnpDevice` says a restart is required, or the device stays in `Status` OK, something vetoed the removal
+while the camera was open. Don't reboot. Record that result: it means this method can't simulate removal on this device.
 
 ## 4. ADR input
 

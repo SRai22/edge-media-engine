@@ -50,14 +50,13 @@ prefer established OSS libraries over custom code; subagents on Sonnet/Haiku.
 
 ## Open issues
 - Owner decision pending: ADR-005 (WHIP vs SDK) blocks EME-007.
-- EME-004 hardware rows still open: `camera_viewer` in a browser and physical unplug/replug on the device (runbook §3.3–3.7).
+- EME-004 hardware rows still open: both viewer tiles not visually confirmed; removal/return not run. Cameras are built in, so runbook §3.4–3.7 simulates removal with PnP disable/enable.
 - Device has no build tools: build on a Windows PC, copy `build-win-static\Release\*.exe,*.dll` to the device and run there.
-- Confirm the LNK4098 (`MSVCRTD`) warning is gone in Windows CI after the OpenH264 lib fix.
 - Not tested: WebRTC under real loss, SFU + P2P together, bitrate on real content, 24 h stress.
 - Installed outside the repo (Linux dev box): `~/vcpkg`, `~/.local/bin/nasm`, `~/deps/livekit-sdk`, `~/deps/lk`, LiveKit Docker images.
 
 ## Next action
 Owner: write ADR-006 from `docs/reports/eme-001-feasibility.md` (evidence points to NV12 + hardware encode), then start EME-006
 (MF hardware H.264 encoder as `IVideoEncoder`, from the probe's `MftEncoder`; keep one ProcessOutput per HaveOutput) and EME-005
-(D3D11 zero-copy). Someone at the device runs runbook §3.3–3.7 (`camera_viewer`, unplug/replug).
+(D3D11 zero-copy). Device agent runs runbook §3.4–3.7 (PnP disable/enable + leak cycles, elevated, owner OK first).
 In parallel once the owner accepts ADR-005: EME-007 (production WHIP publisher).
